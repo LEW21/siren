@@ -7,8 +7,11 @@ This is a rewrite of [siren-sh](https://github.com/LEW21/siren-sh) in Go. It sti
 
 ## Install
 ```console
-$ go get github.com/LEW21/siren
+$ mkdir siren-build
+$ GOPATH=`pwd`/siren-build go get github.com/LEW21/siren
 ```
+
+Siren will be compiled as a single static binary called `siren`, saved in the `siren-build/bin/` directory. You can copy it wherever you want.
 
 ## How it works
 The only magical thing in siren is the way we compose image layers using overlayfs. For each built image, we create new var-lib-machines-imagename.mount and var-lib-machines-imagename.automount systemd units, and enable the second one. This way, systemd automatically mounts overlayfs at /var/lib/machines/imagename when somebody tries to access it, for example by starting a siren-built container. And this way, you don't need siren anywhere in the process of running containers, it's role is finished after the container is built.
