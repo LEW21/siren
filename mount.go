@@ -71,6 +71,10 @@ func destroyMount(sd *systemd.Conn, where string) error {
 }
 
 func setupMountOverlay(sd *systemd.Conn, whatRo []string, whatRW, where string) error {
+	if err := os.MkdirAll("/var/lib/siren/.work", 0700); err != nil {
+		return err
+	}
+
 	if whatRW == "" {
 		switch len(whatRo) {
 			case 0:
