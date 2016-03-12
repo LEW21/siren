@@ -14,11 +14,23 @@ type SirenImage struct {
 	frozen bool
 }
 
-// Image interface
-
 func (i SirenImage) Id() string {
 	return i.id
 }
+
+func (i *SirenImage) SetId(name, version, build string) error {
+	// Systemd allows only 3 special characters in machine names: ".", "-", "_".
+	// We need one of them - and leave the other two to the users.
+	// And we can't take "." as it is commonly used in version numbers.
+	id := name
+	if version != "" {
+		id = id + "-" + version
+	}
+	i.id = id + "-" + build
+	return nil
+}
+
+// Image interface
 
 func (i SirenImage) Root() string {
 	return ImageRoot(i)
