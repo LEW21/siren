@@ -94,15 +94,9 @@ func setupMountOverlay(sd *systemd.Conn, whatRo []string, whatRW, where string) 
 	}
 }
 
-func mount(sd *systemd.Conn, where string) error {
-	return remount(sd, where) // TODO
-}
-
-func remount(sd *systemd.Conn, where string) error {
-	sdname := unit.UnitNamePathEscape(where)
-
+func doUnitOperation(op func(name, mode string, ch chan<- string) (int, error), name, mode string) error {
 	done := make(chan string)
-	_, err := sd.RestartUnit(sdname + ".mount", "replace", done)
+	_, err := op(name, mode, done)
 	if err != nil {
 		return err
 	}
@@ -114,10 +108,17 @@ func remount(sd *systemd.Conn, where string) error {
 	return nil
 }
 
+func mount(sd *systemd.Conn, where string) error {
+	sdname := unit.UnitNamePathEscape(where)
+	return doUnitOperation(sd.StartUnit, sdname + ".mount", "replace")
+}
+
+func remount(sd *systemd.Conn, where string) error {
+	sdname := unit.UnitNamePathEscape(where)
+	return doUnitOperation(sd.RestartUnit, sdname + ".mount", "replace")
+}
+
 func umount(sd *systemd.Conn, where string) error {
 	sdname := unit.UnitNamePathEscape(where)
-
-	sd.StopUnit(sdname + ".mount", "replace", nil)
-
-	return nil
+	return doUnitOperation(sd.StopUnit, sdname + ".mount", "replace")
 }
