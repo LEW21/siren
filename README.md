@@ -13,6 +13,9 @@ $ GOPATH=`pwd`/siren-build go get github.com/LEW21/siren
 
 Siren will be compiled as a single static binary called `siren`, saved in the `siren-build/bin/` directory. You can copy it wherever you want.
 
+## Sirenfiles
+Sirenfiles are text documents containing all the commands necessary for building an image. They are quite similar to Dockerfiles. You can find multiple ready to use Sirenfiles at [LEW21/sirenfiles](https://github.com/LEW21/sirenfiles).
+
 ## How it works
 The only magical thing in siren is the way we compose image layers using overlayfs. For each built image, we create new var-lib-machines-imagename.mount and var-lib-machines-imagename.automount systemd units, and enable the second one. This way, systemd automatically mounts overlayfs at /var/lib/machines/imagename when somebody tries to access it, for example by starting a siren-built container. And this way, you don't need siren anywhere in the process of running containers, it's role is finished after the container is built.
 
