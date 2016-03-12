@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func Build(context BuildContext) error {
+func Build(context *BuildContext) error {
 	sirenfile, err := ioutil.ReadFile(context.Directory + "/Sirenfile")
 	if err != nil {
 		return err

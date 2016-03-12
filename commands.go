@@ -50,14 +50,14 @@ func cmdBuild(args []string) int {
 	defer func(){<-errWritten}()
 	defer errw.Close()
 
-	err = Build(b)
+	err = Build(&b)
 	if err != nil {
 		fmt.Fprintln(errw, err)
 		return 1
 	}
 
 	fmt.Println("Image created.")
-	fmt.Println("Use 'siren create instance_name " + thisName + "' to create a new, writable machine image using this image as a base.")
+	fmt.Println("Use 'siren create instance_name " + b.Image.Id() + "' to create a new, writable machine image using this image as a base.")
 	return 0
 }
 
