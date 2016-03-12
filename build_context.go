@@ -2,11 +2,13 @@ package main
 
 import (
 	"fmt"
+	"time"
 	"io"
 	"io/ioutil"
 	"os/exec"
 	"errors"
 	"strings"
+	"strconv"
 )
 
 type BuildContext struct {
@@ -26,7 +28,16 @@ func (b BuildContext) RealPath(path string) string {
 }
 
 func (b *BuildContext) Id(name, version string) error {
-	b.Image.id = name + "-" + version
+	// Systemd allows only 3 special characters in machine names: ".", "-", "_".
+	// We need one of them - and leave the other two to the users.
+	// And we can't take "." as it is commonly used in version numbers.
+	id := name
+	if version != "" {
+		id = id + "-" + version
+	}
+	// UnixNano has 64 bytes. 16 values are stored in 4 bytes.
+	// This means we always use 64/4 = 16-character identifiers.
+	b.Image.id = id + "-" + strconv.FormatInt(time.Now().UnixNano(), 16)
 	return nil
 }
 
@@ -112,9 +123,19 @@ func (b *BuildContext) Enable(name string) error {
 	return b.Run("systemctl", "enable", name)
 }
 
+var ErrNotEnoughArguments = errors.New("not enough arguments")
+
+// Don't error out when we get too many arguments - we can use them to extend the commands in the future.
+
 func (b *BuildContext) Exec(command string, arg ...string) error {
 	switch (command) {
 		case "ID":
+			switch len(arg) {
+				case 0:
+					return ErrNotEnoughArguments
+				case 1:
+					return b.Id(arg[0], "")
+			}
 			return b.Id(arg[0], arg[1])
 
 		case "FROM":
