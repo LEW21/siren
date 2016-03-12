@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 )
 
-var Commands = []Command{CmdBuild, CmdCreate, CmdRemove, CmdFreeze, CmdUnFreeze, CmdMount, CmdUnMount}
+var Commands = []Command{CmdBuild, CmdCreate, CmdRemove, CmdFreeze, CmdUnFreeze, CmdMount, CmdUnMount, CmdTag}
 
 var CmdBuild = Command{"build", []string{"PATH"}, "Build an image from a Sirenfile", cmdBuild}
 func cmdBuild(args []string) int {
@@ -111,9 +111,23 @@ func printChangeError(err error) int {
 	}
 }
 
-var CmdRemove = Command{"remove", []string{"NAME"}, "Remove an image", cmdRemove}
+var CmdRemove = Command{"remove", []string{"NAME"}, "Remove an image or a tag", cmdRemove}
 func cmdRemove(args []string) int {
 	thisName := args[0]
+
+	err := UnTag(thisName)
+	switch err {
+		case nil:
+			fmt.Println("Tag removed.")
+			return 0
+
+		case ErrNotATag:
+			err = nil
+			break
+
+		default:
+			panic(err)
+	}
 
 	this, _, err := LoadSirenImage(thisName)
 	if err != nil {
@@ -206,5 +220,24 @@ func cmdUnMount(args []string) int {
 	}
 
 	fmt.Println("Image unmounted.")
+	return 0
+}
+
+var CmdTag = Command{"tag", []string{"TAG", "NAME"}, "Create an alias for the image", cmdTag}
+func cmdTag(args []string) int {
+	tag := args[0]
+	thisName := args[1]
+
+	this, err := LoadStdImage(thisName)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Image does not exist.")
+		return 1
+	}
+
+	if err := Tag(tag, this); err != nil {
+		panic(err)
+	}
+
+	fmt.Println("Tag created.")
 	return 0
 }
