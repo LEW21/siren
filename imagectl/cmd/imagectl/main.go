@@ -11,17 +11,16 @@ func main() {
 	args := os.Args[1:]
 
 	allCommands := []imagectl.CommandGroup{
-		{"Siren", Commands},
 		{"Image", imagectl.Commands},
 	}
 
 	if len(args) == 0 || args[0] == "-h" || args[0] == "--help" {
-		imagectl.PrintHelp("Image builder for systemd-machined.", allCommands)
+		imagectl.PrintHelp("Image manager for systemd-machined.", allCommands)
 		return
 	}
 
 	if args[0] == "-v" || args[0] == "--version" {
-		fmt.Println("Siren version 0")
+		fmt.Println("imagectl version 0")
 		return
 	}
 
