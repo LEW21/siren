@@ -6,7 +6,7 @@ import (
 )
 
 func Tag(tag string, image Image) error {
-	if err := os.Symlink(image.Name(), "/var/lib/siren/" + tag); err != nil {
+	if err := os.Symlink(image.Name(), "/var/lib/machines/" + tag); err != nil {
 		return err
 	}
 
@@ -16,7 +16,7 @@ func Tag(tag string, image Image) error {
 var ErrNotATag = errors.New("not a tag")
 
 func ReadTag(tag string) (target string, err error) {
-	target, err = os.Readlink("/var/lib/siren/" + tag);
+	target, err = os.Readlink("/var/lib/machines/" + tag);
 	if err != nil {
 		return "", ErrNotATag
 	}
@@ -29,6 +29,6 @@ func UnTag(tag string) (target string, err error) {
 		return
 	}
 
-	err = os.Remove("/var/lib/siren/" + tag)
+	err = os.Remove("/var/lib/machines/" + tag)
 	return
 }
