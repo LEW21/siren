@@ -85,9 +85,6 @@ func build(context *BuildContext) (imagectl.Image, string, error) {
 			if context.Image, err = ictl.CreateImage(context.id, context.base); err != nil {
 				return err
 			}
-			if err := context.Image.SetReady(true); err != nil {
-				return err
-			}
 
 			imageCreated = true
 		}

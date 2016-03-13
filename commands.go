@@ -50,10 +50,6 @@ func cmdCreate(args []string) int {
 		}
 	}
 
-	if err := i.SetReady(true); err != nil {
-		panic(err)
-	}
-
 	fmt.Println("Image created.")
 	fmt.Println("Use machinectl start " + i.Name() + " to start the container.")
 	return 0

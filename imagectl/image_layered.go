@@ -225,8 +225,7 @@ func (i LayeredImage) create() error {
 	if err := i.saveMetadata(); err != nil {
 		return err
 	}
-
-	return nil
+	return i.SetReady(true)
 }
 
 func (i LayeredImage) saveMetadata() error {
