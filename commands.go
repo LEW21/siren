@@ -2,62 +2,22 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"os"
-	"path/filepath"
 )
 
 var Commands = []Command{CmdBuild, CmdCreate, CmdRemove, CmdFreeze, CmdUnFreeze, CmdMount, CmdUnMount, CmdTag}
 
 var CmdBuild = Command{"build", []string{"PATH"}, "Build an image from a Sirenfile", cmdBuild}
 func cmdBuild(args []string) int {
-	thisName := args[0]
+	path := args[0]
 
-	dir, err := filepath.Abs(thisName)
-	if err != nil {
-		panic(err)
-	}
-
-	outr, outw, err := os.Pipe()
-	if err != nil {
-		panic(err)
-	}
-
-	errr, errw, err := os.Pipe()
-	if err != nil {
-		outw.Close()
-		outr.Close()
-		panic(err)
-	}
-
-	b := BuildContext{SirenImage{"", nil, false}, dir, outw, errw}
-
-	outWritten := make(chan bool)
-	go func() {
-		defer func(){outWritten <- true}()
-		defer outr.Close()
-		io.Copy(os.Stdout, outr)
-	}()
-	defer func(){<-outWritten}()
-	defer outw.Close()
-
-	errWritten := make(chan bool)
-	go func() {
-		defer func(){errWritten <- true}()
-		defer errr.Close()
-		io.Copy(os.Stderr, errr)
-	}()
-	defer func(){<-errWritten}()
-	defer errw.Close()
-
-	err = Build(&b)
-	if err != nil {
-		fmt.Fprintln(errw, err)
+	_, tag, ok := Build(path)
+	if !ok {
 		return 1
 	}
 
 	fmt.Println("Image created.")
-	fmt.Println("Use 'siren create instance_name " + b.Image.Id() + "' to create a new, writable machine image using this image as a base.")
+	fmt.Println("Use 'siren create instance_name " + tag + "' to create a new, writable machine image using this image as a base.")
 	return 0
 }
 

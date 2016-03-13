@@ -18,6 +18,9 @@ type BuildContext struct {
 
 	Stdout io.Writer
 	Stderr io.Writer
+
+	name string
+	version string
 }
 
 func (b BuildContext) RealPath(path string) string {
@@ -31,6 +34,8 @@ func (b *BuildContext) Id(name, version string) error {
 	// UnixNano has 64 bytes. 16 values are stored in 4 bytes.
 	// This means we always use 64/4 = 16-character identifiers.
 	b.Image.SetId(name, version, strconv.FormatInt(time.Now().UnixNano(), 16))
+	b.name = name
+	b.version = version
 	return nil
 }
 
