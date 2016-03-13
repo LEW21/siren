@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-var Commands = []Command{CmdCreate, CmdRemove, CmdFreeze, CmdUnFreeze, CmdMount, CmdUnMount, CmdTag}
+var Commands = []Command{CmdCreate, CmdTag, CmdSetReadOnly, CmdSetReady, CmdRemove}
 
 var CmdCreate = Command{"create", []string{"NAME", "BASE_NAME"}, "Create a new image", cmdCreate}
 func cmdCreate(args []string) int {
@@ -55,15 +55,15 @@ func printChangeError(err error) int {
 	}
 }
 
-var CmdRemove = Command{"remove", []string{"NAME"}, "Remove an image or a tag", cmdRemove}
+var CmdRemove = Command{"remove", []string{"NAME"}, "Remove an image", cmdRemove}
 func cmdRemove(args []string) int {
 	thisName := args[0]
 
-	err := UnTag(thisName)
+	target, err := UnTag(thisName)
 	switch err {
 		case nil:
 			fmt.Println("Tag removed.")
-			return 0
+			thisName = target
 
 		case ErrNotATag:
 			err = nil
@@ -92,9 +92,31 @@ func cmdRemove(args []string) int {
 	return 0
 }
 
-var CmdFreeze = Command{"freeze", []string{"NAME"}, "Mark image read-only", cmdFreeze}
-func cmdFreeze(args []string) int {
+var BoolValues = map[string]bool {
+	"1": true,
+	"y": true,
+	"yes": true,
+	"true": true,
+	"Y": true,
+	"YES": true,
+	"TRUE": true,
+	"0": false,
+	"n": false,
+	"no": false,
+	"false": false,
+	"N": false,
+	"NO": false,
+	"FALSE": false,
+}
+
+var CmdSetReadOnly = Command{"set-read-only", []string{"NAME", "BOOL"}, "Mark or unmark image read-only", cmdSetReadOnly}
+func cmdSetReadOnly(args []string) int {
 	thisName := args[0]
+	value, ok := BoolValues[args[1]]
+	if !ok {
+		fmt.Fprintln(os.Stderr, "Invalid boolean value.")
+		return 1
+	}
 
 	ictl, err := New()
 	if err != nil {
@@ -107,17 +129,26 @@ func cmdFreeze(args []string) int {
 		return 1
 	}
 
-	if err := this.SetReadOnly(true); err != nil {
+	if err := this.SetReadOnly(value); err != nil {
 		return printChangeError(err)
 	}
 
-	fmt.Println("Image frozen.")
+	if this.ReadOnly() {
+		fmt.Println("Image is now read-only.")
+	} else {
+		fmt.Println("Image is now writable.")
+	}
 	return 0
 }
 
-var CmdUnFreeze = Command{"unfreeze", []string{"NAME"}, "Mark image read-write", cmdUnFreeze}
-func cmdUnFreeze(args []string) int {
+var CmdSetReady = Command{"set-ready", []string{"NAME", "BOOL"}, "Assemble or disassemble layered image", cmdSetReady}
+func cmdSetReady(args []string) int {
 	thisName := args[0]
+	value, ok := BoolValues[args[1]]
+	if !ok {
+		fmt.Fprintln(os.Stderr, "Invalid boolean value.")
+		return 1
+	}
 
 	ictl, err := New()
 	if err != nil {
@@ -130,57 +161,15 @@ func cmdUnFreeze(args []string) int {
 		return 1
 	}
 
-	if err := this.SetReadOnly(false); err != nil {
+	if err := this.SetReady(value); err != nil {
 		return printChangeError(err)
 	}
 
-	fmt.Println("Image unfrozen.")
-	return 0
-}
-
-var CmdMount = Command{"mount", []string{"NAME"}, "Mount the image in /var/lib/machines", cmdMount}
-func cmdMount(args []string) int {
-	thisName := args[0]
-
-	ictl, err := New()
-	if err != nil {
-		panic(err)
+	if this.Ready() {
+		fmt.Println("Image is now ready.")
+	} else {
+		fmt.Println("Image is now not ready.")
 	}
-
-	this, err := ictl.GetImage(thisName)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "Image does not exist.")
-		return 1
-	}
-
-	if err := this.SetReady(true); err != nil {
-		return printChangeError(err)
-	}
-
-	fmt.Println("Image mounted.")
-	return 0
-}
-
-var CmdUnMount = Command{"unmount", []string{"NAME"}, "Unmount the image from /var/lib/machines", cmdUnMount}
-func cmdUnMount(args []string) int {
-	thisName := args[0]
-
-	ictl, err := New()
-	if err != nil {
-		panic(err)
-	}
-
-	this, err := ictl.GetImage(thisName)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "Image does not exist.")
-		return 1
-	}
-
-	if err := this.SetReady(false); err != nil {
-		return printChangeError(err)
-	}
-
-	fmt.Println("Image unmounted.")
 	return 0
 }
 

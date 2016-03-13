@@ -50,7 +50,7 @@ func PrintHelp(desc string, commandGroups []CommandGroup) {
 		fmt.Println()
 		fmt.Println(group.Name + " Commands:")
 		for _, c := range group.Commands {
-			fmt.Printf("    %-9v %v\n", c.Name, c.Description)
+			fmt.Printf("  %-27v %v\n", c.Name + " " + strings.Join(c.ReqArgs, " "), c.Description)
 		}
 	}
 }

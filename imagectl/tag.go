@@ -23,14 +23,12 @@ func ReadTag(tag string) (target string, err error) {
 	return
 }
 
-func UnTag(tag string) error {
-	if _, err := os.Readlink("/var/lib/siren/" + tag); err != nil {
-		return ErrNotATag
+func UnTag(tag string) (target string, err error) {
+	target, err = ReadTag(tag)
+	if err != nil {
+		return
 	}
 
-	if err := os.Remove("/var/lib/siren/" + tag); err != nil {
-		return ErrNotATag
-	}
-
-	return nil
+	err = os.Remove("/var/lib/siren/" + tag)
+	return
 }
