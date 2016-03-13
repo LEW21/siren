@@ -7,10 +7,13 @@ import (
 
 var Commands = []Command{CmdCreate, CmdTag, CmdSetReadOnly, CmdSetReady, CmdRemove}
 
-var CmdCreate = Command{"create", []string{"NAME", "BASE_NAME"}, "Create a new image", cmdCreate}
+var CmdCreate = Command{"create", []string{"NAME"}, []string{"BASE_NAME"}, "Create a new image", cmdCreate}
 func cmdCreate(args []string) int {
 	thisName := args[0]
-	baseName := args[1]
+	baseName := ""
+	if len(args) >= 2 {
+		baseName = args[1]
+	}
 
 	ictl, err := New()
 	if err != nil {
@@ -55,7 +58,7 @@ func printChangeError(err error) int {
 	}
 }
 
-var CmdRemove = Command{"remove", []string{"NAME"}, "Remove an image", cmdRemove}
+var CmdRemove = Command{"remove", []string{"NAME"}, nil, "Remove an image", cmdRemove}
 func cmdRemove(args []string) int {
 	thisName := args[0]
 
@@ -109,10 +112,15 @@ var BoolValues = map[string]bool {
 	"FALSE": false,
 }
 
-var CmdSetReadOnly = Command{"set-read-only", []string{"NAME", "BOOL"}, "Mark or unmark image read-only", cmdSetReadOnly}
+var CmdSetReadOnly = Command{"set-read-only", []string{"NAME"}, []string{"BOOL"}, "Mark or unmark image read-only", cmdSetReadOnly}
 func cmdSetReadOnly(args []string) int {
 	thisName := args[0]
-	value, ok := BoolValues[args[1]]
+	svalue := "y"
+	if len(args) >= 2 {
+		svalue = args[1]
+	}
+
+	value, ok := BoolValues[svalue]
 	if !ok {
 		fmt.Fprintln(os.Stderr, "Invalid boolean value.")
 		return 1
@@ -141,10 +149,15 @@ func cmdSetReadOnly(args []string) int {
 	return 0
 }
 
-var CmdSetReady = Command{"set-ready", []string{"NAME", "BOOL"}, "Assemble or disassemble layered image", cmdSetReady}
+var CmdSetReady = Command{"set-ready", []string{"NAME"}, []string{"BOOL"}, "Assemble or disassemble layered image", cmdSetReady}
 func cmdSetReady(args []string) int {
 	thisName := args[0]
-	value, ok := BoolValues[args[1]]
+	svalue := "y"
+	if len(args) >= 2 {
+		svalue = args[1]
+	}
+
+	value, ok := BoolValues[svalue]
 	if !ok {
 		fmt.Fprintln(os.Stderr, "Invalid boolean value.")
 		return 1
@@ -173,7 +186,7 @@ func cmdSetReady(args []string) int {
 	return 0
 }
 
-var CmdTag = Command{"tag", []string{"TAG", "NAME"}, "Create an alias for the image", cmdTag}
+var CmdTag = Command{"tag", []string{"TAG", "NAME"}, nil, "Create an alias for the image", cmdTag}
 func cmdTag(args []string) int {
 	tag := args[0]
 	thisName := args[1]

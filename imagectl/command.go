@@ -9,18 +9,40 @@ import (
 type Command struct {
 	Name        string
 	ReqArgs     []string
+	OptArgs     []string
 	Description string
 	Executor    func(args []string) int
 }
 
+func (c Command) ArgsDescription() string {
+	desc := strings.Join(c.ReqArgs, " ")
+	if len(c.OptArgs) > 0 {
+		desc = desc + " [" + strings.Join(c.OptArgs, "] [") + "]"
+	}
+	return desc
+}
+
 func (c Command) CheckArgs(args []string) bool {
-	if len(args) < len(c.ReqArgs) {
-		if len(c.ReqArgs) == 1 {
-			fmt.Fprintf(os.Stderr, "%v: \"%v\" requires 1 argument.\n\n", os.Args[0], c.Name)
+	at_least := len(c.ReqArgs)
+	at_most := len(c.ReqArgs) + len(c.OptArgs)
+
+	if len(args) < at_least {
+		if at_least == 1 {
+			fmt.Fprintf(os.Stderr, "%v: \"%v\" requires at least 1 argument.\n\n", os.Args[0], c.Name)
 		} else {
-			fmt.Fprintf(os.Stderr, "%v: \"%v\" requires %v arguments.\n\n", os.Args[0], c.Name, len(c.ReqArgs))
+			fmt.Fprintf(os.Stderr, "%v: \"%v\" requires at least %v arguments.\n\n", os.Args[0], c.Name, at_least)
 		}
-		fmt.Fprintf(os.Stderr, "Usage: %v %v %v\n\n", os.Args[0], c.Name, strings.Join(c.ReqArgs, " "))
+		fmt.Fprintf(os.Stderr, "Usage: %v %v %v\n\n", os.Args[0], c.Name, c.ArgsDescription())
+		fmt.Fprint(os.Stderr, c.Description + "\n")
+		return false
+	}
+	if len(args) > at_most {
+		if at_most == 1 {
+			fmt.Fprintf(os.Stderr, "%v: \"%v\" takes at most 1 argument.\n\n", os.Args[0], c.Name)
+		} else {
+			fmt.Fprintf(os.Stderr, "%v: \"%v\" takes at most %v arguments.\n\n", os.Args[0], c.Name, at_most)
+		}
+		fmt.Fprintf(os.Stderr, "Usage: %v %v %v\n\n", os.Args[0], c.Name, c.ArgsDescription())
 		fmt.Fprint(os.Stderr, c.Description + "\n")
 		return false
 	}
@@ -50,7 +72,7 @@ func PrintHelp(desc string, commandGroups []CommandGroup) {
 		fmt.Println()
 		fmt.Println(group.Name + " Commands:")
 		for _, c := range group.Commands {
-			fmt.Printf("  %-27v %v\n", c.Name + " " + strings.Join(c.ReqArgs, " "), c.Description)
+			fmt.Printf("  %-27v %v\n", c.Name + " " + c.ArgsDescription(), c.Description)
 		}
 	}
 }
