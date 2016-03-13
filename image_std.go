@@ -45,6 +45,11 @@ func (i StdImage) ReadOnly() (bool, error) {
 var ErrNotADirectory = errors.New("not a directory")
 
 func LoadStdImage(name string) (StdImage, error) {
+	target, err := ReadTag(name)
+	if err == nil {
+		name = target
+	}
+
 	tmp := StdImage{name}
 
 	fi, err := os.Stat(tmp.Root())

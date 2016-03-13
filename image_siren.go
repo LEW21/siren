@@ -59,6 +59,11 @@ func (i SirenImage) ReadOnly() (bool, error) {
 // Loader
 
 func LoadSirenImage(name string) (SirenImage, []error, error) {
+	target, err := ReadTag(name)
+	if err == nil {
+		name = target
+	}
+
 	tmp := SirenImage{name, nil, false}
 
 	id, err := ioutil.ReadFile(tmp.LayerPath("/id"))
