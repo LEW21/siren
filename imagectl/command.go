@@ -7,6 +7,7 @@ import (
 )
 
 type Command struct {
+	Shortcuts   []string
 	Name        string
 	ReqArgs     []string
 	OptArgs     []string
@@ -72,7 +73,11 @@ func PrintHelp(desc string, commandGroups []CommandGroup) {
 		fmt.Println()
 		fmt.Println(group.Name + " Commands:")
 		for _, c := range group.Commands {
-			fmt.Printf("  %-27v %v\n", c.Name + " " + c.ArgsDescription(), c.Description)
+			shortcut := ""
+			if len(c.Shortcuts) > 0 {
+				shortcut = c.Shortcuts[0] + ","
+			}
+			fmt.Printf("  %5v %-27v %v\n", shortcut, c.Name + " " + c.ArgsDescription(), c.Description)
 		}
 	}
 }
@@ -88,6 +93,9 @@ func RunCommand(args []string, commandGroups []CommandGroup) int {
 	for _, group := range commandGroups {
 		for _, cmd := range group.Commands {
 			commandMap[cmd.Name] = cmd
+			for _, shortcut := range cmd.Shortcuts {
+				commandMap[shortcut] = cmd
+			}
 		}
 	}
 

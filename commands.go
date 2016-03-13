@@ -8,7 +8,7 @@ import (
 
 var Commands = []imagectl.Command{CmdBuild}
 
-var CmdBuild = imagectl.Command{"build", []string{"PATH"}, nil, "Build an image from a Sirenfile", cmdBuild}
+var CmdBuild = imagectl.Command{nil, "build", []string{"PATH"}, nil, "Build an image from a Sirenfile", cmdBuild}
 func cmdBuild(args []string) int {
 	path := args[0]
 
