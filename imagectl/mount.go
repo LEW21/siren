@@ -71,7 +71,7 @@ func destroyMount(sd *systemd.Conn, where string) error {
 }
 
 func setupMountOverlay(sd *systemd.Conn, whatRo []string, whatRW, where string) error {
-	if err := os.MkdirAll("/var/lib/siren/.work", 0700); err != nil {
+	if err := os.MkdirAll("/var/lib/image-layers/.work", 0700); err != nil {
 		return err
 	}
 
@@ -89,7 +89,7 @@ func setupMountOverlay(sd *systemd.Conn, whatRo []string, whatRW, where string) 
 			case 0:
 				return setupMount(sd, whatRW, where, "none", "bind")
 			default:
-				return setupMount(sd, "overlay", where, "overlay", "lowerdir=" + strings.Join(whatRo, ":") + ",upperdir=" + whatRW + ",workdir=/var/lib/siren/.work")
+				return setupMount(sd, "overlay", where, "overlay", "lowerdir=" + strings.Join(whatRo, ":") + ",upperdir=" + whatRW + ",workdir=/var/lib/image-layers/.work")
 		}
 	}
 }

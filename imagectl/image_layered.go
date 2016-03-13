@@ -200,7 +200,7 @@ func (i *LayeredImage) Optimize(statusCb func(string), errorCb func(error)) {
 // Implementation
 
 func (i LayeredImage) LayerRoot() string {
-	return "/var/lib/siren/" + i.Name()
+	return "/var/lib/image-layers/" + i.Name()
 }
 
 func (i LayeredImage) LayerFSRoot() string {
