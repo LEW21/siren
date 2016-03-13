@@ -1,4 +1,4 @@
-package main
+package imagectl
 
 import (
 	"io"
@@ -10,17 +10,17 @@ import (
 	"github.com/ivaxer/go-xattr"
 )
 
-func OptimizeLayer(i SirenImage, statusCb func(string)) {
-	if err := removeUnchanged(i, statusCb); err != nil {
-		statusCb(err.Error())
+func optimizeLayeredImage(i *LayeredImage, statusCb func(string), errorCb func(error)) {
+	if err := removeUnchanged(i, statusCb, errorCb); err != nil {
+		errorCb(err)
 	}
 
-	if err := removeEmpty(i, statusCb); err != nil {
-		statusCb(err.Error())
+	if err := removeEmpty(i, statusCb, errorCb); err != nil {
+		errorCb(err)
 	}
 }
 
-func removeUnchanged(i SirenImage, statusCb func(string)) error {
+func removeUnchanged(i *LayeredImage, statusCb func(string), errorCb func(error)) error {
 	if i.base == nil {
 		return nil
 	}
@@ -80,7 +80,7 @@ func removeUnchanged(i SirenImage, statusCb func(string)) error {
 	})
 }
 
-func removeEmpty(i SirenImage, statusCb func(string)) error {
+func removeEmpty(i *LayeredImage, statusCb func(string), errorCb func(error)) error {
 	if i.base == nil {
 		return nil
 	}

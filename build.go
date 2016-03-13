@@ -8,9 +8,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/LEW21/siren/imagectl"
 )
 
-func Build(path string) (image SirenImage, tag string, ok bool) {
+func Build(path string) (image imagectl.Image, tag string, ok bool) {
 	dir, err := filepath.Abs(path)
 	if err != nil {
 		panic(err)
@@ -28,7 +30,7 @@ func Build(path string) (image SirenImage, tag string, ok bool) {
 		panic(err)
 	}
 
-	b := BuildContext{SirenImage{"", nil, false}, dir, outw, errw, "", ""}
+	b := BuildContext{nil, dir, outw, errw, "", "", "", ""}
 
 	outWritten := make(chan bool)
 	go func() {
@@ -51,21 +53,21 @@ func Build(path string) (image SirenImage, tag string, ok bool) {
 	image, tag, err = build(&b)
 	if err != nil {
 		fmt.Fprintln(errw, err)
-		return SirenImage{}, "", false
+		return nil, "", false
 	}
 
 	return image, tag, true
 }
 
-func build(context *BuildContext) (SirenImage, string, error) {
+func build(context *BuildContext) (imagectl.Image, string, error) {
 	sirenfile, err := ioutil.ReadFile(context.Directory + "/Sirenfile")
 	if err != nil {
-		return SirenImage{}, "", err
+		return nil, "", err
 	}
 
 	commands, err := ParseSirenfile(string(sirenfile))
 	if err != nil {
-		return SirenImage{}, "", err
+		return nil, "", err
 	}
 
 	metaCommands := map[string]bool{"ID":true, "FROM":true}
@@ -74,9 +76,16 @@ func build(context *BuildContext) (SirenImage, string, error) {
 	needImage := func() error {
 		if !imageCreated {
 			fmt.Fprintln(context.Stderr)
-			fmt.Fprintln(context.Stderr, "# Creating an image: " + context.Image.Id())
+			fmt.Fprintln(context.Stderr, "# Creating an image: " + context.id)
 
-			if err := context.Image.Create(); err != nil {
+			ictl, err := imagectl.New()
+			if err != nil {
+				return err
+			}
+			if context.Image, err = ictl.CreateImage(context.id, context.base); err != nil {
+				return err
+			}
+			if err := context.Image.SetReady(true); err != nil {
 				return err
 			}
 
@@ -89,7 +98,7 @@ func build(context *BuildContext) (SirenImage, string, error) {
 	for _, cmd := range commands {
 		if !metaCommands[cmd[0]] {
 			if err := needImage(); err != nil {
-				return SirenImage{}, "", err
+				return nil, "", err
 			}
 		}
 
@@ -97,45 +106,45 @@ func build(context *BuildContext) (SirenImage, string, error) {
 		fmt.Fprintln(context.Stderr, "# " + cmd[0] + " (" + strings.Join(cmd[1:], ") (") + ")")
 
 		if err := context.Exec(cmd[0], cmd[1:]...); err != nil {
-			return SirenImage{}, "", err
+			return nil, "", err
 		}
 	}
 
 	if err := needImage(); err != nil {
-		return SirenImage{}, "", err
+		return nil, "", err
 	}
 
 	fmt.Fprintln(context.Stderr)
 	fmt.Fprintln(context.Stderr, "# Cleaning up the container...")
 
 	if err := moveSystemdConfigToUsr(context.Image); err != nil {
-		return SirenImage{}, "", err
+		return nil, "", err
 	}
 
 	fmt.Fprintln(context.Stderr)
 	fmt.Fprintln(context.Stderr, "# Unmounting...")
 
-	if err := context.Image.UnMount(); err != nil {
-		return SirenImage{}, "", err
+	if err := context.Image.SetReady(false); err != nil {
+		return nil, "", err
 	}
 
 	fmt.Fprintln(context.Stderr)
 	fmt.Fprintln(context.Stderr, "# Reducing layer size...")
 
-	OptimizeLayer(context.Image, func(status string){fmt.Fprintln(context.Stderr, status)})
+	context.Image.Optimize(func (status string){fmt.Fprintln(context.Stderr, status)}, func(err error){fmt.Fprintln(context.Stderr, err)})
 
 	fmt.Fprintln(context.Stderr)
 	fmt.Fprintln(context.Stderr, "# Freezing...")
 
-	if err := context.Image.Freeze(); err != nil {
-		return SirenImage{}, "", err
+	if err := context.Image.SetReadOnly(true); err != nil {
+		return nil, "", err
 	}
 
 	fmt.Fprintln(context.Stderr)
 	fmt.Fprintln(context.Stderr, "# Mounting...")
 
-	if err := context.Image.Mount(); err != nil {
-		return SirenImage{}, "", err
+	if err := context.Image.SetReady(true); err != nil {
+		return nil, "", err
 	}
 
 	fmt.Fprintln(context.Stderr)
@@ -146,15 +155,15 @@ func build(context *BuildContext) (SirenImage, string, error) {
 		tag = tag + "-" + context.version
 	}
 
-	UnTag(tag)
-	if err := Tag(tag, context.Image); err != nil {
-		return SirenImage{}, "", err
+	imagectl.UnTag(tag)
+	if err := imagectl.Tag(tag, context.Image); err != nil {
+		return nil, "", err
 	}
 
 	return context.Image, tag, nil
 }
 
-func moveSystemdConfigToUsr(i Image) error {
+func moveSystemdConfigToUsr(i imagectl.Image) error {
 	cmd := i.Command("mkdir", "-p", "/etc/systemd/system", "/etc/systemd/user", "/etc/systemd/network")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return errors.New(err.Error() + ": " + string(out))

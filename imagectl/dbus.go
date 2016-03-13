@@ -1,4 +1,4 @@
-package main
+package imagectl
 
 import (
 	"github.com/godbus/dbus"

@@ -1,4 +1,4 @@
-package main
+package imagectl
 
 import (
 	"errors"
@@ -6,7 +6,7 @@ import (
 )
 
 func Tag(tag string, image Image) error {
-	if err := os.Symlink(image.Id(), "/var/lib/siren/" + tag); err != nil {
+	if err := os.Symlink(image.Name(), "/var/lib/siren/" + tag); err != nil {
 		return err
 	}
 

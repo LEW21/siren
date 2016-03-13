@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+
+	"github.com/LEW21/siren/imagectl"
 )
 
 var Commands = []Command{CmdBuild, CmdCreate, CmdRemove, CmdFreeze, CmdUnFreeze, CmdMount, CmdUnMount, CmdTag}
@@ -26,23 +28,21 @@ func cmdCreate(args []string) int {
 	thisName := args[0]
 	baseName := args[1]
 
-	base := Image(nil)
-	if baseName != "" {
-		var err error
-		base, err = LoadStdImage(baseName)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "Base image does not exist.")
-			return 1
-		}
+	ictl, err := imagectl.New()
+	if err != nil {
+		panic(err)
 	}
-	this := SirenImage{thisName, base, false}
 
-	if err := this.Create(); err != nil {
+	i, err := ictl.CreateImage(thisName, baseName)
+	if err != nil {
 		switch err {
-			case ErrBaseWritable:
+			case imagectl.ErrBaseDoesNotExist:
+				fmt.Fprintln(os.Stderr, "Base image does not exist.")
+				return 1
+			case imagectl.ErrBaseWritable:
 				fmt.Fprintln(os.Stderr, "Base image is writable. Freeze it first.")
 				return 1
-			case ErrImageExists:
+			case imagectl.ErrImageExists:
 				fmt.Fprintln(os.Stderr, "Image already exists. Refusing to overwrite.")
 				return 1
 			default:
@@ -50,8 +50,12 @@ func cmdCreate(args []string) int {
 		}
 	}
 
+	if err := i.SetReady(true); err != nil {
+		panic(err)
+	}
+
 	fmt.Println("Image created.")
-	fmt.Println("Use machinectl start " + thisName + " to start the container.")
+	fmt.Println("Use machinectl start " + i.Name() + " to start the container.")
 	return 0
 }
 
@@ -63,7 +67,7 @@ func printWarnings(problems []error) {
 
 func printChangeError(err error) int {
 	switch err {
-		case ErrImageAlive:
+		case imagectl.ErrImageAlive:
 			fmt.Fprintln(os.Stderr, "Image is currently running as a machine. Stop it first.")
 			return 1
 		default:
@@ -75,13 +79,13 @@ var CmdRemove = Command{"remove", []string{"NAME"}, "Remove an image or a tag", 
 func cmdRemove(args []string) int {
 	thisName := args[0]
 
-	err := UnTag(thisName)
+	err := imagectl.UnTag(thisName)
 	switch err {
 		case nil:
 			fmt.Println("Tag removed.")
 			return 0
 
-		case ErrNotATag:
+		case imagectl.ErrNotATag:
 			err = nil
 			break
 
@@ -89,7 +93,12 @@ func cmdRemove(args []string) int {
 			panic(err)
 	}
 
-	this, _, err := LoadSirenImage(thisName)
+	ictl, err := imagectl.New()
+	if err != nil {
+		panic(err)
+	}
+
+	this, err := ictl.GetImage(thisName)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Image does not exist.")
 		return 1
@@ -107,15 +116,18 @@ var CmdFreeze = Command{"freeze", []string{"NAME"}, "Mark image read-only", cmdF
 func cmdFreeze(args []string) int {
 	thisName := args[0]
 
-	this, problems, err := LoadSirenImage(thisName)
+	ictl, err := imagectl.New()
+	if err != nil {
+		panic(err)
+	}
+
+	this, err := ictl.GetImage(thisName)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Image does not exist.")
 		return 1
 	}
 
-	printWarnings(problems)
-
-	if err := this.Freeze(); err != nil {
+	if err := this.SetReadOnly(true); err != nil {
 		return printChangeError(err)
 	}
 
@@ -127,15 +139,18 @@ var CmdUnFreeze = Command{"unfreeze", []string{"NAME"}, "Mark image read-write",
 func cmdUnFreeze(args []string) int {
 	thisName := args[0]
 
-	this, problems, err := LoadSirenImage(thisName)
+	ictl, err := imagectl.New()
+	if err != nil {
+		panic(err)
+	}
+
+	this, err := ictl.GetImage(thisName)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Image does not exist.")
 		return 1
 	}
 
-	printWarnings(problems)
-
-	if err := this.UnFreeze(); err != nil {
+	if err := this.SetReadOnly(false); err != nil {
 		return printChangeError(err)
 	}
 
@@ -147,15 +162,18 @@ var CmdMount = Command{"mount", []string{"NAME"}, "Mount the image in /var/lib/m
 func cmdMount(args []string) int {
 	thisName := args[0]
 
-	this, problems, err := LoadSirenImage(thisName)
+	ictl, err := imagectl.New()
+	if err != nil {
+		panic(err)
+	}
+
+	this, err := ictl.GetImage(thisName)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Image does not exist.")
 		return 1
 	}
 
-	printWarnings(problems)
-
-	if err := this.Mount(); err != nil {
+	if err := this.SetReady(true); err != nil {
 		return printChangeError(err)
 	}
 
@@ -167,15 +185,18 @@ var CmdUnMount = Command{"unmount", []string{"NAME"}, "Unmount the image from /v
 func cmdUnMount(args []string) int {
 	thisName := args[0]
 
-	this, problems, err := LoadSirenImage(thisName)
+	ictl, err := imagectl.New()
+	if err != nil {
+		panic(err)
+	}
+
+	this, err := ictl.GetImage(thisName)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Image does not exist.")
 		return 1
 	}
 
-	printWarnings(problems)
-
-	if err := this.UnMount(); err != nil {
+	if err := this.SetReady(false); err != nil {
 		return printChangeError(err)
 	}
 
@@ -188,13 +209,18 @@ func cmdTag(args []string) int {
 	tag := args[0]
 	thisName := args[1]
 
-	this, err := LoadStdImage(thisName)
+	mctl, err := imagectl.NewMachineCtl()
+	if err != nil {
+		panic(err)
+	}
+
+	this, err := mctl.GetImage(thisName)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Image does not exist.")
 		return 1
 	}
 
-	if err := Tag(tag, this); err != nil {
+	if err := imagectl.Tag(tag, &this); err != nil {
 		panic(err)
 	}
 

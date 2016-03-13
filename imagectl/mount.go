@@ -1,4 +1,4 @@
-package main
+package imagectl
 
 import (
 	"errors"

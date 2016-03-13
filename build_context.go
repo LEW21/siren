@@ -9,15 +9,20 @@ import (
 	"errors"
 	"strings"
 	"strconv"
+
+	"github.com/LEW21/siren/imagectl"
 )
 
 type BuildContext struct {
-	Image SirenImage
+	Image imagectl.Image
 
 	Directory string
 
 	Stdout io.Writer
 	Stderr io.Writer
+
+	id string
+	base string
 
 	name string
 	version string
@@ -31,20 +36,25 @@ func (b BuildContext) RealPath(path string) string {
 }
 
 func (b *BuildContext) Id(name, version string) error {
+	// Systemd allows only 3 special characters in machine names: ".", "-", "_".
+	// We need one of them - and leave the other two to the users.
+	// And we can't take "." as it is commonly used in version numbers.
+	id := name
+	if version != "" {
+		id = id + "-" + version
+	}
+	id = id + "-" + strconv.FormatInt(time.Now().UnixNano(), 16)
+
 	// UnixNano has 64 bytes. 16 values are stored in 4 bytes.
 	// This means we always use 64/4 = 16-character identifiers.
-	b.Image.SetId(name, version, strconv.FormatInt(time.Now().UnixNano(), 16))
+	b.id = id
 	b.name = name
 	b.version = version
 	return nil
 }
 
 func (b *BuildContext) From(baseName string) error {
-	base, err := LoadStdImage(baseName)
-	if err != nil {
-		return err
-	}
-	b.Image.base = base
+	b.base = baseName
 	return nil
 }
 
