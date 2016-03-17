@@ -108,3 +108,31 @@ func (c *Conn) GetMachine(name string) (dbus.BusObject, error) {
 
 	return c.conn.Object("org.freedesktop.machine1", call.Body[0].(dbus.ObjectPath)), nil
 }
+
+type ImageInfo struct {
+	Name, Type string
+	ReadOnly bool
+	CreationTimestamp, ModificationTimestamp, Usage uint64
+	Object dbus.BusObject
+}
+
+func (c *Conn) ListImages() ([]ImageInfo, error) {
+	call := c.object.Call(dbusInterface+".ListImages", 0)
+	if call.Err != nil {
+		return nil, call.Err
+	}
+
+	vlist := call.Body[0].([][]interface{})
+	list := make([]ImageInfo, 0, len(vlist))
+
+	for _, v := range vlist {
+		list = append(list, ImageInfo{
+			v[0].(string), v[1].(string),
+			v[2].(bool),
+			v[3].(uint64), v[4].(uint64), v[5].(uint64),
+			c.conn.Object("org.freedesktop.machine1", v[6].(dbus.ObjectPath)),
+		})
+	}
+
+	return list, nil
+}

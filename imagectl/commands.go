@@ -3,9 +3,11 @@ package imagectl
 import (
 	"fmt"
 	"os"
+	"strconv"
+	"github.com/fatih/color"
 )
 
-var Commands = []Command{CmdCreate, CmdTag, CmdSetReadOnly, CmdSetReady, CmdRemove}
+var Commands = []Command{CmdCreate, CmdTag, CmdSetReadOnly, CmdSetReady, CmdRemove, CmdList}
 
 var CmdCreate = Command{[]string{"new"}, "create", []string{"NAME"}, []string{"BASE_NAME"}, "Create a new image", cmdCreate}
 func cmdCreate(args []string) int {
@@ -207,5 +209,57 @@ func cmdTag(args []string) int {
 	}
 
 	fmt.Println("Tag created.")
+	return 0
+}
+
+// machinectl list-images / docker images
+var CmdList = Command{[]string{"ls", "list-images", "images"}, "list", nil, nil, "Show available container and VM images", cmdList}
+func cmdList(args []string) int {
+	ictl, err := New()
+	if err != nil {
+		panic(err)
+	}
+
+	images, err := ictl.ListImages()
+	if err != nil {
+		panic(err)
+	}
+
+	columns := []Column{
+		{"NAME",  func(i interface{})(string, color.Attribute){return i.(Image).Name(), 0}},
+		{"TYPE",  func(i interface{})(string, color.Attribute){return i.(Image).Type(), 0}},
+		{"RO",    func(i interface{})(string, color.Attribute){
+			if i.(Image).ReadOnly() {
+				return "RO", color.FgGreen
+			} else {
+				return "RW", color.FgBlue
+			}
+		}},
+		{"READY", func(i interface{})(string, color.Attribute){
+			if i.(Image).Ready() {
+				return "yes", color.FgGreen
+			} else {
+				return "no", color.FgRed
+			}
+		}},
+		{"ALIVE", func(i interface{})(string, color.Attribute){
+			if i.(Image).Alive() {
+				return "yes", color.FgGreen
+			} else if !i.(Image).ReadOnly() { // RW images are usually supposed to be alive.
+				return "no", color.FgRed
+			} else {
+				return "no", color.FgBlue
+			}
+		}},
+	}
+	data := make([]interface{}, len(images))
+	for i := range data {
+		data[i] = images[i]
+	}
+	printTable(os.Stdout, columns, data)
+
+	fmt.Println()
+	fmt.Println(strconv.Itoa(len(images)) + " images listed.")
+
 	return 0
 }

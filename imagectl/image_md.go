@@ -35,6 +35,41 @@ func (mctl MachineCtl) GetImage(name string) (MdImage, error) {
 	return i, err
 }
 
+func (mctl MachineCtl) listImages_Dbus() ([]MdImage, error) {
+	mlist, err := mctl.md.ListImages()
+	if err != nil {
+		return nil, err
+	}
+	list := make([]MdImage, 0, len(mlist))
+	for _, mdImageInfo := range mlist {
+		i := MdImage{mdImageInfo.Name, "/var/lib/machines/" + mdImageInfo.Name, mdImageInfo.Type, mdImageInfo.ReadOnly, true, true, mctl.md, mdImageInfo.Object}
+		i.checkIfAlive()
+		list = append(list, i)
+	}
+	return list, nil
+}
+
+func (mctl MachineCtl) ListImages() ([]MdImage, error) {
+	f, err := os.Open("/var/lib/machines")
+	if err != nil {
+		return nil, err
+	}
+	dirs, err := f.Readdir(-1)
+	f.Close()
+
+	images := make([]MdImage, 0, len(dirs))
+	for _, dir := range dirs {
+		if !dir.IsDir() {
+			continue
+		}
+
+		if i, err := mctl.GetImage(dir.Name()); err == nil {
+			images = append(images, i)
+		}
+	}
+	return images, nil
+}
+
 func (mctl MachineCtl) CreateImage(name, baseName string) (MdImage, error) {
 	base := (*MdImage)(nil)
 	if baseName != "" {
@@ -129,7 +164,17 @@ func (i *MdImage) Update() error {
 	i.type_    = properties["Type"].Value().(string)
 	i.readOnly = properties["ReadOnly"].Value().(bool)
 	i.ready    = true
-	i.alive    = true
+
+	if err := i.checkIfAlive(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Internal:
+func (i *MdImage) checkIfAlive() error {
+	i.alive = true
 
 	_, err := i.md.GetMachine(i.Name())
 	if isDbusError(err, "org.freedesktop.machine1.NoSuchMachine") {
@@ -137,7 +182,6 @@ func (i *MdImage) Update() error {
 	} else if err != nil {
 		return err
 	}
-
 	return nil
 }
 

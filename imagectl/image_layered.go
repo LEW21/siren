@@ -25,6 +25,27 @@ func (lictl LayeredImageCtl) GetImage(name string) (LayeredImage, error) {
 	return i, err
 }
 
+func (lictl LayeredImageCtl) ListImages() ([]LayeredImage, error) {
+	f, err := os.Open("/var/lib/image-layers")
+	if err != nil {
+		return nil, err
+	}
+	dirs, err := f.Readdir(-1)
+	f.Close()
+
+	images := make([]LayeredImage, 0, len(dirs))
+	for _, dir := range dirs {
+		if !dir.IsDir() {
+			continue
+		}
+
+		if i, err := lictl.GetImage(dir.Name()); err == nil {
+			images = append(images, i)
+		}
+	}
+	return images, nil
+}
+
 func (lictl LayeredImageCtl) CreateImage(name, baseName string) (LayeredImage, error) {
 	base := (*MdImage)(nil)
 	if baseName != "" {
