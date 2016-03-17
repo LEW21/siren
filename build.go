@@ -68,7 +68,7 @@ func ReadMetadata(commands [][]string) (id, tag, name, version, base string, err
 	return
 }
 
-func Build(directory string, writer io.Writer) (image imagectl.Image, tag string, ok bool) {
+func Build(directory, tag string, writer io.Writer) (image imagectl.Image, ret_tag string, ok bool) {
 	defer func(){
 		if r := recover(); r != nil {
 			ok = false
@@ -95,8 +95,12 @@ func Build(directory string, writer io.Writer) (image imagectl.Image, tag string
 	//ret tag
 	func(){
 		task := NewTask(writer, "Reading metadata"); defer task.Finish()
+		var tag2 string
 		var err error
-		id, tag, _, _, base, err = ReadMetadata(commands)
+		id, tag2, _, _, base, err = ReadMetadata(commands)
+		if tag == "" {
+			tag = tag2
+		}
 		task.Require(err)
 	}()
 
@@ -129,11 +133,13 @@ func Build(directory string, writer io.Writer) (image imagectl.Image, tag string
 	NewTask(writer, "Freezing").RequireAndFinish(image.SetReadOnly(true))
 	NewTask(writer, "Mounting").RequireAndFinish(image.SetReady(true))
 
-	func(){
-		task := NewTask(writer, "Tagging"); defer task.Finish()
-		imagectl.UnTag(tag)
-		task.Require(imagectl.Tag(tag, image))
-	}()
+	if tag != "-" {
+		func(){
+			task := NewTask(writer, "Tagging"); defer task.Finish()
+			imagectl.UnTag(tag)
+			task.Require(imagectl.Tag(tag, image))
+		}()
+	}
 
 	return image, tag, true
 }
