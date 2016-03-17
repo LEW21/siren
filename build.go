@@ -5,159 +5,137 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"os"
-	"path/filepath"
-	"strings"
+	"time"
+	"strconv"
 
 	"github.com/LEW21/siren/imagectl"
 )
 
-func Build(path string) (image imagectl.Image, tag string, ok bool) {
-	dir, err := filepath.Abs(path)
-	if err != nil {
-		panic(err)
+func ReadMetadata(commands [][]string) (id, tag, name, version, base string, err error) {
+	var idCmd, fromCmd []string
+
+	done := false
+	for len(commands) > 0 && !done {
+		switch commands[0][0] {
+			case "ID":
+				idCmd = commands[0]
+				commands = commands[1:]
+			case "FROM":
+				fromCmd = commands[0]
+				commands = commands[1:]
+			default:
+				done = true
+		}
 	}
 
-	outr, outw, err := os.Pipe()
-	if err != nil {
-		panic(err)
+	if idCmd == nil {
+		err = errors.New("No ID command.")
+		return
 	}
 
-	errr, errw, err := os.Pipe()
-	if err != nil {
-		outw.Close()
-		outr.Close()
-		panic(err)
+	if len(idCmd) >= 2 {
+		name = idCmd[1]
+	} else {
+		err = errors.New("ID requires at least one argument.")
+		return
 	}
 
-	b := BuildContext{nil, dir, outw, errw, "", "", "", ""}
-
-	outWritten := make(chan bool)
-	go func() {
-		defer func(){outWritten <- true}()
-		defer outr.Close()
-		io.Copy(os.Stdout, outr)
-	}()
-	defer func(){<-outWritten}()
-	defer outw.Close()
-
-	errWritten := make(chan bool)
-	go func() {
-		defer func(){errWritten <- true}()
-		defer errr.Close()
-		io.Copy(os.Stderr, errr)
-	}()
-	defer func(){<-errWritten}()
-	defer errw.Close()
-
-	image, tag, err = build(&b)
-	if err != nil {
-		fmt.Fprintln(errw, err)
-		return nil, "", false
+	if len(idCmd) >= 3 {
+		version = idCmd[2]
 	}
 
-	return image, tag, true
+	// Systemd allows only 3 special characters in machine names: ".", "-", "_".
+	// We need one of them - and leave the other two to the users.
+	// And we can't take "." as it is commonly used in version numbers.
+	tag = name
+	if version != "" {
+		tag = tag + "-" + version
+	}
+
+	// UnixNano has 64 bytes. 16 values are stored in 4 bytes.
+	// This means we always use 64/4 = 16-character identifiers.
+	id = tag + "-" + strconv.FormatInt(time.Now().UnixNano(), 16)
+
+	if fromCmd != nil {
+		if len(fromCmd) >= 2 {
+			base = fromCmd[1]
+		} else {
+			err = errors.New("FROM requires at least one argument.")
+			return
+		}
+	}
+
+	return
 }
 
-func build(context *BuildContext) (imagectl.Image, string, error) {
-	sirenfile, err := ioutil.ReadFile(context.Directory + "/Sirenfile")
-	if err != nil {
-		return nil, "", err
-	}
-
-	commands, err := ParseSirenfile(string(sirenfile))
-	if err != nil {
-		return nil, "", err
-	}
-
-	metaCommands := map[string]bool{"ID":true, "FROM":true}
-
-	imageCreated := false
-	needImage := func() error {
-		if !imageCreated {
-			fmt.Fprintln(context.Stderr)
-			fmt.Fprintln(context.Stderr, "# Creating an image: " + context.id)
-
-			ictl, err := imagectl.New()
-			if err != nil {
-				return err
-			}
-			if context.Image, err = ictl.CreateImage(context.id, context.base); err != nil {
-				return err
-			}
-
-			imageCreated = true
+func Build(directory string, writer io.Writer) (image imagectl.Image, tag string, ok bool) {
+	defer func(){
+		if r := recover(); r != nil {
+			ok = false
 		}
+	}()
 
-		return nil
-	}
+	var sirenfile []byte
+	func(){
+		task := NewTask(writer, "Reading Sirenfile"); defer task.Finish()
+		var err error
+		sirenfile, err = ioutil.ReadFile(directory + "/Sirenfile")
+		task.Require(err)
+	}()
 
-	for _, cmd := range commands {
-		if !metaCommands[cmd[0]] {
-			if err := needImage(); err != nil {
-				return nil, "", err
-			}
+	var commands [][]string
+	func(){
+		task := NewTask(writer, "Parsing Sirenfile"); defer task.Finish()
+		var err error
+		commands, err = ParseSirenfile(string(sirenfile))
+		task.Require(err)
+	}()
+
+	var id, base string
+	//ret tag
+	func(){
+		task := NewTask(writer, "Reading metadata"); defer task.Finish()
+		var err error
+		id, tag, _, _, base, err = ReadMetadata(commands)
+		task.Require(err)
+	}()
+
+	//ret image
+	func(){
+		task := NewTask(writer, "Creating an image: " + id); defer task.Finish()
+
+		ictl, err := imagectl.New()
+		task.Require(err)
+		image, err = ictl.CreateImage(id, base)
+		task.Require(err)
+	}()
+
+	func(){
+		task := NewTask(writer, "Building the image"); defer task.Finish()
+		b := BuildContext{task, image, directory}
+		for _, cmd := range commands {
+			b.Exec(cmd)
 		}
+	}()
 
-		fmt.Fprintln(context.Stderr)
-		fmt.Fprintln(context.Stderr, "# " + cmd[0] + " (" + strings.Join(cmd[1:], ") (") + ")")
+	NewTask(writer, "Cleaning up the container").RequireAndFinish(moveSystemdConfigToUsr(image))
+	NewTask(writer, "Unmounting").RequireAndFinish(image.SetReady(false))
 
-		if err := context.Exec(cmd[0], cmd[1:]...); err != nil {
-			return nil, "", err
-		}
-	}
+	func(){
+		task := NewTask(writer, "Reducing layer size"); defer task.Finish()
+		image.Optimize(func (status string){fmt.Fprintln(task, status)}, func(err error){fmt.Fprintln(task, err)})
+	}()
 
-	if err := needImage(); err != nil {
-		return nil, "", err
-	}
+	NewTask(writer, "Freezing").RequireAndFinish(image.SetReadOnly(true))
+	NewTask(writer, "Mounting").RequireAndFinish(image.SetReady(true))
 
-	fmt.Fprintln(context.Stderr)
-	fmt.Fprintln(context.Stderr, "# Cleaning up the container...")
+	func(){
+		task := NewTask(writer, "Tagging"); defer task.Finish()
+		imagectl.UnTag(tag)
+		task.Require(imagectl.Tag(tag, image))
+	}()
 
-	if err := moveSystemdConfigToUsr(context.Image); err != nil {
-		return nil, "", err
-	}
-
-	fmt.Fprintln(context.Stderr)
-	fmt.Fprintln(context.Stderr, "# Unmounting...")
-
-	if err := context.Image.SetReady(false); err != nil {
-		return nil, "", err
-	}
-
-	fmt.Fprintln(context.Stderr)
-	fmt.Fprintln(context.Stderr, "# Reducing layer size...")
-
-	context.Image.Optimize(func (status string){fmt.Fprintln(context.Stderr, status)}, func(err error){fmt.Fprintln(context.Stderr, err)})
-
-	fmt.Fprintln(context.Stderr)
-	fmt.Fprintln(context.Stderr, "# Freezing...")
-
-	if err := context.Image.SetReadOnly(true); err != nil {
-		return nil, "", err
-	}
-
-	fmt.Fprintln(context.Stderr)
-	fmt.Fprintln(context.Stderr, "# Mounting...")
-
-	if err := context.Image.SetReady(true); err != nil {
-		return nil, "", err
-	}
-
-	fmt.Fprintln(context.Stderr)
-	fmt.Fprintln(context.Stderr, "# Tagging...")
-
-	tag := context.name
-	if context.version != "" {
-		tag = tag + "-" + context.version
-	}
-
-	imagectl.UnTag(tag)
-	if err := imagectl.Tag(tag, context.Image); err != nil {
-		return nil, "", err
-	}
-
-	return context.Image, tag, nil
+	return image, tag, true
 }
 
 func moveSystemdConfigToUsr(i imagectl.Image) error {

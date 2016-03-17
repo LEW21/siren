@@ -2,30 +2,17 @@ package main
 
 import (
 	"fmt"
-	"time"
-	"io"
 	"io/ioutil"
-	"os/exec"
 	"errors"
 	"strings"
-	"strconv"
 
 	"github.com/LEW21/siren/imagectl"
 )
 
 type BuildContext struct {
+	Task Task
 	Image imagectl.Image
-
 	Directory string
-
-	Stdout io.Writer
-	Stderr io.Writer
-
-	id string
-	base string
-
-	name string
-	version string
 }
 
 func (b BuildContext) RealPath(path string) string {
@@ -35,44 +22,8 @@ func (b BuildContext) RealPath(path string) string {
 	return b.Directory + "/" + path
 }
 
-func (b *BuildContext) Id(name, version string) error {
-	// Systemd allows only 3 special characters in machine names: ".", "-", "_".
-	// We need one of them - and leave the other two to the users.
-	// And we can't take "." as it is commonly used in version numbers.
-	id := name
-	if version != "" {
-		id = id + "-" + version
-	}
-	id = id + "-" + strconv.FormatInt(time.Now().UnixNano(), 16)
-
-	// UnixNano has 64 bytes. 16 values are stored in 4 bytes.
-	// This means we always use 64/4 = 16-character identifiers.
-	b.id = id
-	b.name = name
-	b.version = version
-	return nil
-}
-
-func (b *BuildContext) From(baseName string) error {
-	b.base = baseName
-	return nil
-}
-
-func (b *BuildContext) runCmd(cmd *exec.Cmd) error {
-	fmt.Fprintln(b.Stderr, "## " + cmd.Args[0] + " (" + strings.Join(cmd.Args[1:], ") (") + ")")
-
-	cmd.Stdout = b.Stdout
-	cmd.Stderr = b.Stderr
-
-	return cmd.Run()
-}
-
-func (b *BuildContext) runCommand(name string, arg ...string) error {
-	return b.runCmd(exec.Command(name, arg...))
-}
-
 func (b *BuildContext) Run(name string, arg ...string) error {
-	return b.runCmd(b.Image.Command(name, arg...))
+	return b.Task.RunCmd(b.Image.Command(name, arg...))
 }
 
 func (b *BuildContext) Copy(arg ...string) error {
@@ -87,7 +38,7 @@ func (b *BuildContext) Copy(arg ...string) error {
 	}
 
 	args = append(args, b.Image.RealPath(dst))
-	return b.runCommand("cp", args...)
+	return b.Task.RunCommand("cp", args...)
 }
 
 func (b *BuildContext) Untar(arg ...string) error {
@@ -95,7 +46,7 @@ func (b *BuildContext) Untar(arg ...string) error {
 	src := arg[:len(arg)-1]
 
 	for _, tarfile := range src {
-		err := b.runCommand("tar", "-xf", b.RealPath(tarfile), "-C", b.Image.RealPath(dst))
+		err := b.Task.RunCommand("tar", "-xf", b.RealPath(tarfile), "-C", b.Image.RealPath(dst))
 		if err != nil {
 			return err
 		}
@@ -126,7 +77,7 @@ func (b *BuildContext) AddUnit(name string) error {
 func (b *BuildContext) Enable(name string) error {
 	name = unitName(name)
 	if err := b.addUnit(name); err != nil {
-		fmt.Fprintln(b.Stderr, "Warning: " + name + " file not found.")
+		fmt.Fprintln(b.Task, "Warning: " + name + " file not found.")
 	}
 	return b.Run("systemctl", "enable", name)
 }
@@ -135,20 +86,11 @@ var ErrNotEnoughArguments = errors.New("not enough arguments")
 
 // Don't error out when we get too many arguments - we can use them to extend the commands in the future.
 
-func (b *BuildContext) Exec(command string, arg ...string) error {
+func (b *BuildContext) Exec(cmd []string) error {
+	command := cmd[0]
+	arg := cmd[1:]
+
 	switch (command) {
-		case "ID":
-			switch len(arg) {
-				case 0:
-					return ErrNotEnoughArguments
-				case 1:
-					return b.Id(arg[0], "")
-			}
-			return b.Id(arg[0], arg[1])
-
-		case "FROM":
-			return b.From(arg[0])
-
 		case "RUN":
 			return b.Run(arg[0], arg[1:]...)
 
@@ -170,4 +112,12 @@ func (b *BuildContext) Exec(command string, arg ...string) error {
 		default:
 			return errors.New("Unknown command: " + command)
 	}
+}
+
+func (b *BuildContext) SubtaskExec(cmd []string) {
+	subtask := NewTask(b.Task, cmd[0] + " (" + strings.Join(cmd[1:], ") (") + ")"); defer subtask.Finish()
+	maintask := b.Task
+	b.Task = subtask; defer func(){b.Task = maintask}()
+
+	b.Task.Require(b.Exec(cmd))
 }
