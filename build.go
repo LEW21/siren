@@ -11,7 +11,7 @@ import (
 	"github.com/LEW21/siren/imagectl"
 )
 
-func ReadMetadata(commands_in [][]string) (id, tag, name, version, base string, commands [][]string, err error) {
+func ReadMetadata(commands_in [][]string) (id, tag, name, version, base string, baseSources []string, commands [][]string, err error) {
 	commands = commands_in
 
 	var idCmd, fromCmd []string
@@ -65,12 +65,14 @@ func ReadMetadata(commands_in [][]string) (id, tag, name, version, base string, 
 			err = errors.New("FROM requires at least one argument.")
 			return
 		}
+
+		baseSources = fromCmd[2:]
 	}
 
 	return
 }
 
-func Build(directory, tag string, writer io.Writer) (image imagectl.Image, ret_tag string, ok bool) {
+func Build(ictl imagectl.ImageCtl, directory, tag string, writer io.Writer) (image imagectl.Image, ret_tag string, ok bool) {
 	EnsureSirenDirExists()
 
 	defer func(){
@@ -96,24 +98,36 @@ func Build(directory, tag string, writer io.Writer) (image imagectl.Image, ret_t
 	}()
 
 	var id, base string
+	var baseSources []string
 	//ret tag
 	func(){
 		task := NewTask(writer, "Reading metadata"); defer task.Finish()
 		var tag2 string
 		var err error
-		id, tag2, _, _, base, commands, err = ReadMetadata(commands)
+		id, tag2, _, _, base, baseSources, commands, err = ReadMetadata(commands)
 		if tag == "" {
 			tag = tag2
 		}
 		task.Require(err)
 	}()
 
+	if _, err := ictl.GetImage(base); err != nil {
+		for _, source := range baseSources {
+			var ok bool
+			func(){
+				task := NewTask(writer, "Pulling the base image: " + source); defer task.Finish()
+				_, _, ok = Pull(ictl, source, base, task)
+			}()
+			if ok {
+				break
+			}
+		}
+	}
+
 	//ret image
 	func(){
 		task := NewTask(writer, "Creating an image: " + id); defer task.Finish()
-
-		ictl, err := imagectl.New()
-		task.Require(err)
+		var err error
 		image, err = ictl.CreateImage(id, base)
 		task.Require(err)
 	}()

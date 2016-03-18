@@ -23,7 +23,12 @@ func cmdBuild(args []string) int {
 		panic(err)
 	}
 
-	_, tag, ok := Build(path, tag, os.Stderr)
+	ictl, err := imagectl.New()
+	if err != nil {
+		panic(err)
+	}
+
+	_, tag, ok := Build(ictl, path, tag, os.Stderr)
 	if !ok {
 		return 1
 	}
@@ -42,7 +47,12 @@ func cmdPull(args []string) int {
 		tag = args[1]
 	}
 
-	_, tag, ok := Pull(uri, tag, os.Stderr)
+	ictl, err := imagectl.New()
+	if err != nil {
+		panic(err)
+	}
+
+	_, tag, ok := Pull(ictl, uri, tag, os.Stderr)
 	if !ok {
 		return 1
 	}
