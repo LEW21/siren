@@ -11,7 +11,9 @@ import (
 	"github.com/LEW21/siren/imagectl"
 )
 
-func ReadMetadata(commands [][]string) (id, tag, name, version, base string, err error) {
+func ReadMetadata(commands_in [][]string) (id, tag, name, version, base string, commands [][]string, err error) {
+	commands = commands_in
+
 	var idCmd, fromCmd []string
 
 	done := false
@@ -97,7 +99,7 @@ func Build(directory, tag string, writer io.Writer) (image imagectl.Image, ret_t
 		task := NewTask(writer, "Reading metadata"); defer task.Finish()
 		var tag2 string
 		var err error
-		id, tag2, _, _, base, err = ReadMetadata(commands)
+		id, tag2, _, _, base, commands, err = ReadMetadata(commands)
 		if tag == "" {
 			tag = tag2
 		}
@@ -118,7 +120,7 @@ func Build(directory, tag string, writer io.Writer) (image imagectl.Image, ret_t
 		task := NewTask(writer, "Building the image"); defer task.Finish()
 		b := BuildContext{task, image, directory}
 		for _, cmd := range commands {
-			b.Exec(cmd)
+			b.SubtaskExec(cmd)
 		}
 	}()
 
