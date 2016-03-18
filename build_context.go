@@ -1,13 +1,15 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
-	"errors"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 
+	"github.com/coreos/go-systemd/unit"
 	"github.com/LEW21/siren/imagectl"
 )
 
@@ -46,11 +48,17 @@ func (b *BuildContext) Copy(arg ...string) error {
 func (b *BuildContext) download(uri *url.URL) (res *url.URL, err error) {
 	res = &url.URL{}
 
-	components := strings.Split(uri.Path, "/")
-	res.Path = b.RealPath(components[len(components)-1])
-
 	res.Fragment = uri.Fragment
 	uri.Fragment = ""
+
+	res.Path = "/var/lib/siren/" + unit.UnitNameEscape(uri.String())
+
+	{
+		_, err := os.Stat(res.Path)
+		if err == nil {
+			return res, nil
+		}
+	}
 
 	err = b.Task.RunCommand("wget", uri.String(), "-O", res.Path, "--progress=dot:mega")
 
