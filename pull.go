@@ -4,7 +4,6 @@ import (
 	"errors"
 	"io"
 	"os"
-	"strings"
 	"net/url"
 
 	"github.com/coreos/go-systemd/unit"
@@ -26,21 +25,14 @@ func Pull(uri, tag string, writer io.Writer) (image imagectl.Image, ret_tag stri
 		task.Require(err)
 	}()
 
-	dir := ""
-	if strings.Contains(u.Path, ":") {
-		splitted := strings.SplitN(u.Path, ":", 2)
-		u.Path = splitted[0]
-		dir = splitted[1]
-		if len(dir) > 0 && dir[0] == '/' {
-			dir = dir[1:]
-		}
-	}
+	var subpath string
+	u.Path, subpath = SplitSubPath(u.Path)
 
 	uri = u.String()
 	repoRoot := "/var/lib/siren/" + unit.UnitNameEscape(uri)
 	sourceRoot := repoRoot
-	if dir != "" {
-		sourceRoot = repoRoot + "/" + dir
+	if subpath != "" {
+		sourceRoot = repoRoot + "/" + subpath
 	}
 
 	fi, err := os.Stat(repoRoot)

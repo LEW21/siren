@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"errors"
+	"strconv"
 	"strings"
 
 	"github.com/LEW21/siren/imagectl"
@@ -46,7 +47,16 @@ func (b *BuildContext) Untar(arg ...string) error {
 	src := arg[:len(arg)-1]
 
 	for _, tarfile := range src {
-		err := b.Task.RunCommand("tar", "-xf", b.RealPath(tarfile), "-C", b.Image.RealPath(dst))
+		tarfile, subpath := SplitSubPath(tarfile)
+
+		args := []string{"-xf", b.RealPath(tarfile), "-C", b.Image.RealPath(dst)}
+
+		if subpath != "" {
+			strip_components := 1 + strings.Count(subpath, "/")
+			args = append(args, subpath, "--strip-components", strconv.Itoa(strip_components))
+		}
+
+		err := b.Task.RunCommand("tar", args...)
 		if err != nil {
 			return err
 		}
