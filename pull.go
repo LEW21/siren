@@ -11,7 +11,7 @@ import (
 	"github.com/LEW21/siren/imagectl"
 )
 
-func Pull(ictl imagectl.ImageCtl, uri, tag string, writer io.Writer) (image imagectl.Image, ret_tag string, ok bool) {
+func Pull(ictl *imagectl.ImageCtl, uri, tag string, writer io.Writer) (image imagectl.Image, ret_tag string, ok bool) {
 	EnsureSirenDirExists()
 
 	defer func(){

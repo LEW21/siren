@@ -9,21 +9,21 @@ type ImageCtl struct {
 	lictl LayeredImageCtl
 }
 
-func New() (ImageCtl, error) {
-	ictl := ImageCtl{}
+func New() (*ImageCtl, error) {
+	ictl := &ImageCtl{}
 	err := error(nil)
 	ictl.mctl, err = NewMachineCtl()
 	if err != nil {
-		return ImageCtl{}, err
+		return nil, err
 	}
-	ictl.lictl, err = NewLayeredImageCtl(ictl.mctl)
+	ictl.lictl, err = NewLayeredImageCtl(ictl.mctl.md, ictl.GetImage)
 	if err != nil {
-		return ImageCtl{}, err
+		return nil, err
 	}
 	return ictl, nil
 }
 
-func (ictl ImageCtl) ListImages() ([]Image, error) {
+func (ictl *ImageCtl) ListImages() ([]Image, error) {
 	image_map := make(map[string]Image)
 
 	mctl_images, err := ictl.mctl.ListImages()
@@ -58,7 +58,7 @@ func (ictl ImageCtl) ListImages() ([]Image, error) {
 	return images, nil
 }
 
-func (ictl ImageCtl) GetImage(name string) (Image, error) {
+func (ictl *ImageCtl) GetImage(name string) (Image, error) {
 	{
 		i, err := ictl.lictl.GetImage(name)
 		if err == nil {
@@ -78,7 +78,7 @@ func (ictl ImageCtl) GetImage(name string) (Image, error) {
 	}
 }
 
-func (ictl ImageCtl) CreateImage(name string, base Image) (Image, error) {
+func (ictl *ImageCtl) CreateImage(name string, base Image) (Image, error) {
 	i, err := ictl.lictl.CreateImage(name, base)
 	if err == nil {
 		return &i, nil

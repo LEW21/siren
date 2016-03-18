@@ -43,7 +43,7 @@ func (mctl MachineCtl) listImages_Dbus() ([]MdImage, error) {
 	list := make([]MdImage, 0, len(mlist))
 	for _, mdImageInfo := range mlist {
 		i := MdImage{mdImageInfo.Name, "/var/lib/machines/" + mdImageInfo.Name, mdImageInfo.Type, mdImageInfo.ReadOnly, true, true, mctl.md, mdImageInfo.Object}
-		i.checkIfAlive()
+		i.alive, _ = IsImageAlive(mctl.md, i.Name())
 		list = append(list, i)
 	}
 	return list, nil
@@ -154,24 +154,9 @@ func (i *MdImage) Update() error {
 	i.readOnly = properties["ReadOnly"].Value().(bool)
 	i.ready    = true
 
-	if err := i.checkIfAlive(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Internal:
-func (i *MdImage) checkIfAlive() error {
-	i.alive = true
-
-	_, err := i.md.GetMachine(i.Name())
-	if isDbusError(err, "org.freedesktop.machine1.NoSuchMachine") {
-		i.alive = false
-	} else if err != nil {
-		return err
-	}
-	return nil
+	var err error
+	i.alive, err = IsImageAlive(i.md, i.Name())
+	return err
 }
 
 // Hard actions

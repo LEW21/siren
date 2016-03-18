@@ -5,14 +5,18 @@ import (
 	"os/exec"
 	"io/ioutil"
 	systemd "github.com/coreos/go-systemd/dbus"
+	"github.com/LEW21/siren/imagectl/machine1"
 )
 
+type ImageGetter func(string) (Image, error)
+
 type LayeredImageCtl struct {
-	mctl MachineCtl
+	md *machine1.Conn
+	getAnyImage ImageGetter
 }
 
-func NewLayeredImageCtl(mctl MachineCtl) (LayeredImageCtl, error) {
-	return LayeredImageCtl{mctl}, nil
+func NewLayeredImageCtl(md *machine1.Conn, getAnyImage ImageGetter) (LayeredImageCtl, error) {
+	return LayeredImageCtl{md, getAnyImage}, nil
 }
 
 func (lictl LayeredImageCtl) GetImage(name string) (LayeredImage, error) {
@@ -20,7 +24,7 @@ func (lictl LayeredImageCtl) GetImage(name string) (LayeredImage, error) {
 		name = target
 	}
 
-	i := LayeredImage{name, nil, false, lictl.mctl, false, false}
+	i := LayeredImage{name, nil, false, lictl.getAnyImage, false, false, lictl.md}
 	err := i.Update()
 	return i, err
 }
@@ -51,11 +55,11 @@ func (lictl LayeredImageCtl) CreateImage(name string, base Image) (LayeredImage,
 		return LayeredImage{}, ErrBaseWritable
 	}
 
-	if _, err := lictl.mctl.GetImage(name); err == nil {
+	if _, err := lictl.getAnyImage(name); err == nil {
 		return LayeredImage{}, ErrImageExists
 	}
 
-	i := LayeredImage{name, base, false, lictl.mctl, false, false}
+	i := LayeredImage{name, base, false, lictl.getAnyImage, false, false, lictl.md}
 	err := i.create()
 	return i, err
 }
@@ -65,8 +69,9 @@ type LayeredImage struct {
 	base Image
 	frozen bool
 
-	mctl MachineCtl
+	getAnyImage ImageGetter
 	ready, alive bool
+	md *machine1.Conn
 }
 
 // Image interface
@@ -113,26 +118,21 @@ func (i *LayeredImage) Update() error {
 	i.base = nil
 	baseName, _ := ioutil.ReadFile(i.LayerPath("/base"))
 	if baseName != nil {
-		b, err := i.mctl.GetImage(string(baseName))
+		b, err := i.getAnyImage(string(baseName))
 		if err != nil {
 			return err
 		}
-		i.base = &b
+		i.base = b
 	}
 
 	frozen, _ := ioutil.ReadFile(i.LayerPath("/frozen"))
 	i.frozen = string(frozen) != "n"
 
-	image, err := i.mctl.GetImage(i.Name())
-	if err == ErrNoSuchImage {
-		i.ready = false
-		i.alive = false
-	} else {
-		i.ready = true
-		i.alive = image.Alive()
-	}
+	fi, err := os.Stat(i.Path())
+	i.ready = err == nil && fi.IsDir()
 
-	return nil
+	i.alive, err = IsImageAlive(i.md, i.Name())
+	return err
 }
 
 // Hard actions

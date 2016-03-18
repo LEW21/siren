@@ -3,6 +3,7 @@ package imagectl
 import (
 	"errors"
 	"os/exec"
+	"github.com/LEW21/siren/imagectl/machine1"
 )
 
 type Image interface {
@@ -57,4 +58,12 @@ func ImageCommand(i Image, name string, arg ...string) *exec.Cmd {
 	args = append(args, arg...)
 
 	return exec.Command("systemd-nspawn", args...)
+}
+
+func IsImageAlive(md *machine1.Conn, name string) (bool, error) {
+	_, err := md.GetMachine(name)
+	if isDbusError(err, "org.freedesktop.machine1.NoSuchMachine") {
+		return false, nil
+	}
+	return true, err
 }

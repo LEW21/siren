@@ -72,7 +72,7 @@ func ReadMetadata(commands_in [][]string) (id, tag, name, version, baseName stri
 	return
 }
 
-func Build(ictl imagectl.ImageCtl, directory, tag string, writer io.Writer) (image imagectl.Image, ret_tag string, ok bool) {
+func Build(ictl *imagectl.ImageCtl, directory, tag string, writer io.Writer) (image imagectl.Image, ret_tag string, ok bool) {
 	EnsureSirenDirExists()
 
 	defer func(){
