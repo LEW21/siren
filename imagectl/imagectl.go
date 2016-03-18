@@ -78,8 +78,8 @@ func (ictl ImageCtl) GetImage(name string) (Image, error) {
 	}
 }
 
-func (ictl ImageCtl) CreateImage(name, baseName string) (Image, error) {
-	i, err := ictl.lictl.CreateImage(name, baseName)
+func (ictl ImageCtl) CreateImage(name string, base Image) (Image, error) {
+	i, err := ictl.lictl.CreateImage(name, base)
 	if err == nil {
 		return &i, nil
 	} else {

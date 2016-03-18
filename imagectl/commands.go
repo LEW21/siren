@@ -22,12 +22,24 @@ func cmdCreate(args []string) int {
 		panic(err)
 	}
 
-	i, err := ictl.CreateImage(thisName, baseName)
+	var base Image
+	if baseName != "" {
+		var err error
+		base, err = ictl.GetImage(baseName)
+		if err != nil {
+			switch err {
+				case ErrNoSuchImage:
+					fmt.Fprintln(os.Stderr, "Base image does not exist.")
+					return 1
+				default:
+					panic(err)
+			}
+		}
+	}
+
+	i, err := ictl.CreateImage(thisName, base)
 	if err != nil {
 		switch err {
-			case ErrBaseDoesNotExist:
-				fmt.Fprintln(os.Stderr, "Base image does not exist.")
-				return 1
 			case ErrBaseWritable:
 				fmt.Fprintln(os.Stderr, "Base image is writable. Freeze it first.")
 				return 1

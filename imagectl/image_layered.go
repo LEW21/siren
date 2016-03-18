@@ -46,20 +46,9 @@ func (lictl LayeredImageCtl) ListImages() ([]LayeredImage, error) {
 	return images, nil
 }
 
-func (lictl LayeredImageCtl) CreateImage(name, baseName string) (LayeredImage, error) {
-	base := (*MdImage)(nil)
-	if baseName != "" {
-		b, err := lictl.mctl.GetImage(baseName)
-		if err != nil {
-			if err == ErrNoSuchImage {
-				err = ErrBaseDoesNotExist
-			}
-			return LayeredImage{}, err
-		}
-		if !b.ReadOnly() {
-			return LayeredImage{}, ErrBaseWritable
-		}
-		base = &b
+func (lictl LayeredImageCtl) CreateImage(name string, base Image) (LayeredImage, error) {
+	if base != nil && !base.ReadOnly() {
+		return LayeredImage{}, ErrBaseWritable
 	}
 
 	if _, err := lictl.mctl.GetImage(name); err == nil {
@@ -73,7 +62,7 @@ func (lictl LayeredImageCtl) CreateImage(name, baseName string) (LayeredImage, e
 
 type LayeredImage struct {
 	id string
-	base *MdImage
+	base Image
 	frozen bool
 
 	mctl MachineCtl

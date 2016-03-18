@@ -70,20 +70,9 @@ func (mctl MachineCtl) ListImages() ([]MdImage, error) {
 	return images, nil
 }
 
-func (mctl MachineCtl) CreateImage(name, baseName string) (MdImage, error) {
-	base := (*MdImage)(nil)
-	if baseName != "" {
-		b, err := mctl.GetImage(baseName)
-		if err != nil {
-			if err == ErrNoSuchImage {
-				err = ErrBaseDoesNotExist
-			}
-			return MdImage{}, err
-		}
-		if !b.ReadOnly() {
-			return MdImage{}, ErrBaseWritable
-		}
-		base = &b
+func (mctl MachineCtl) CreateImage(name string, base Image) (MdImage, error) {
+	if base != nil && !base.ReadOnly() {
+		return MdImage{}, ErrBaseWritable
 	}
 
 	if _, err := mctl.GetImage(name); err == nil {
@@ -91,7 +80,7 @@ func (mctl MachineCtl) CreateImage(name, baseName string) (MdImage, error) {
 	}
 
 	if base != nil {
-		call := base.mdImage.Call("org.freedesktop.machine1.Image.Clone", 0, name, false)
+		call := mctl.md.Object.Call("org.freedesktop.machine1.Manager.CloneImage", 0, base.Name(), name, false)
 		if call.Err != nil {
 			return MdImage{}, call.Err
 		}

@@ -11,7 +11,7 @@ import (
 	"github.com/LEW21/siren/imagectl"
 )
 
-func ReadMetadata(commands_in [][]string) (id, tag, name, version, base string, baseSources []string, commands [][]string, err error) {
+func ReadMetadata(commands_in [][]string) (id, tag, name, version, baseName string, baseSources []string, commands [][]string, err error) {
 	commands = commands_in
 
 	var idCmd, fromCmd []string
@@ -60,7 +60,7 @@ func ReadMetadata(commands_in [][]string) (id, tag, name, version, base string, 
 
 	if fromCmd != nil {
 		if len(fromCmd) >= 2 {
-			base = fromCmd[1]
+			baseName = fromCmd[1]
 		} else {
 			err = errors.New("FROM requires at least one argument.")
 			return
@@ -97,31 +97,43 @@ func Build(ictl imagectl.ImageCtl, directory, tag string, writer io.Writer) (ima
 		task.Require(err)
 	}()
 
-	var id, base string
+	var id, baseName string
 	var baseSources []string
 	//ret tag
 	func(){
 		task := NewTask(writer, "Reading metadata"); defer task.Finish()
 		var tag2 string
 		var err error
-		id, tag2, _, _, base, baseSources, commands, err = ReadMetadata(commands)
+		id, tag2, _, _, baseName, baseSources, commands, err = ReadMetadata(commands)
 		if tag == "" {
 			tag = tag2
 		}
 		task.Require(err)
 	}()
 
-	if _, err := ictl.GetImage(base); err != nil {
-		for _, source := range baseSources {
-			var ok bool
-			func(){
-				task := NewTask(writer, "Pulling the base image: " + source); defer task.Finish()
-				_, _, ok = Pull(ictl, source, base, task)
-			}()
-			if ok {
-				break
+	var base imagectl.Image
+	if baseName != "" {
+		func(){
+			task := NewTask(writer, "Accessing the base image: " + baseName); defer task.Finish()
+
+			var err error
+			if base, err = ictl.GetImage(baseName); err != nil {
+				for _, source := range baseSources {
+					var ok bool
+					func(){
+						task := NewTask(task, "Pulling the base image: " + source); defer task.Finish()
+						base, _, ok = Pull(ictl, source, baseName, task)
+					}()
+					if ok {
+						break
+					}
+				}
 			}
-		}
+
+			if base == nil {
+				task.Require(errors.New("Base image does not exist."))
+			}
+		}()
 	}
 
 	//ret image
