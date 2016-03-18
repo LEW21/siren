@@ -235,7 +235,7 @@ func (i LayeredImage) LayerPath(path string) string {
 	return i.LayerRoot() + path
 }
 
-func (i LayeredImage) create() error {
+func (i *LayeredImage) create() error {
 	if err := os.MkdirAll(i.LayerRoot(), 0700); err != nil {
 		return err
 	}
@@ -249,7 +249,7 @@ func (i LayeredImage) create() error {
 	return i.SetReady(true)
 }
 
-func (i LayeredImage) saveMetadata() error {
+func (i *LayeredImage) saveMetadata() error {
 	if err := ioutil.WriteFile(i.LayerPath("/id"), []byte(i.Name()), 0644); err != nil {
 		return err
 	}
