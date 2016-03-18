@@ -11,7 +11,7 @@ import (
 )
 
 type BuildContext struct {
-	Task Task
+	Task *Task
 	Image imagectl.Image
 	Directory string
 }
