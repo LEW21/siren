@@ -35,15 +35,7 @@ const (
 // Conn is a connection to systemds dbus endpoint.
 type Conn struct {
 	conn   *dbus.Conn
-	object dbus.BusObject
-}
-
-type Image struct {
 	Object dbus.BusObject
-}
-
-type Machine struct {
-	object dbus.BusObject
 }
 
 // New() establishes a connection to the system bus and authenticates.
@@ -81,18 +73,18 @@ func (c *Conn) initConnection() error {
 		return err
 	}
 
-	c.object = c.conn.Object("org.freedesktop.machine1", dbus.ObjectPath(dbusPath))
+	c.Object = c.conn.Object("org.freedesktop.machine1", dbus.ObjectPath(dbusPath))
 
 	return nil
 }
 
 // RegisterMachine registers the container with the systemd-machined
 func (c *Conn) RegisterMachine(name string, id []byte, service string, class string, pid int, root_directory string) error {
-	return c.object.Call(dbusInterface+".RegisterMachine", 0, name, id, service, class, uint32(pid), root_directory).Err
+	return c.Object.Call(dbusInterface+".RegisterMachine", 0, name, id, service, class, uint32(pid), root_directory).Err
 }
 
 func (c *Conn) GetImage(name string) (dbus.BusObject, error) {
-	call := c.object.Call(dbusInterface+".GetImage", 0, name)
+	call := c.Object.Call(dbusInterface+".GetImage", 0, name)
 	if call.Err != nil {
 		return nil, call.Err
 	}
@@ -101,7 +93,7 @@ func (c *Conn) GetImage(name string) (dbus.BusObject, error) {
 }
 
 func (c *Conn) GetMachine(name string) (dbus.BusObject, error) {
-	call := c.object.Call(dbusInterface+".GetMachine", 0, name)
+	call := c.Object.Call(dbusInterface+".GetMachine", 0, name)
 	if call.Err != nil {
 		return nil, call.Err
 	}
@@ -117,7 +109,7 @@ type ImageInfo struct {
 }
 
 func (c *Conn) ListImages() ([]ImageInfo, error) {
-	call := c.object.Call(dbusInterface+".ListImages", 0)
+	call := c.Object.Call(dbusInterface+".ListImages", 0)
 	if call.Err != nil {
 		return nil, call.Err
 	}
