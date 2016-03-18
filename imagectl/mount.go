@@ -75,6 +75,13 @@ func setupMountOverlay(sd *systemd.Conn, whatRo []string, whatRW, where string) 
 		return err
 	}
 
+	// I guess overlayfs was designed in Australia.
+	whatRoReversed := make([]string, 0, len(whatRo))
+	for i := len(whatRo)-1; i >= 0; i-- {
+		whatRoReversed = append(whatRoReversed, whatRo[i])
+	}
+	whatRo = whatRoReversed
+
 	if whatRW == "" {
 		switch len(whatRo) {
 			case 0:
