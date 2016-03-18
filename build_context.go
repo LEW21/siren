@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"errors"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -42,22 +43,48 @@ func (b *BuildContext) Copy(arg ...string) error {
 	return b.Task.RunCommand("cp", args...)
 }
 
+func (b *BuildContext) download(uri *url.URL) (res *url.URL, err error) {
+	res = &url.URL{}
+
+	components := strings.Split(uri.Path, "/")
+	res.Path = b.RealPath(components[len(components)-1])
+
+	res.Fragment = uri.Fragment
+	uri.Fragment = ""
+
+	err = b.Task.RunCommand("wget", uri.String(), "-O", res.Path, "--progress=dot:mega")
+
+	return res, err
+}
+
 func (b *BuildContext) Untar(arg ...string) error {
 	dst := arg[len(arg)-1]
 	src := arg[:len(arg)-1]
 
 	for _, tarfile := range src {
-		tarfile, subpath := SplitSubPath(tarfile)
-
-		args := []string{"-xf", b.RealPath(tarfile), "-C", b.Image.RealPath(dst)}
-
-		if subpath != "" {
-			strip_components := 1 + strings.Count(subpath, "/")
-			args = append(args, subpath, "--strip-components", strconv.Itoa(strip_components))
+		u, err := url.Parse(tarfile)
+		if err != nil {
+			return err
 		}
 
-		err := b.Task.RunCommand("tar", args...)
-		if err != nil {
+		if u.Scheme == "http" || u.Scheme == "https" {
+			var err error
+			u, err = b.download(u)
+			if err != nil {
+				return err
+			}
+		} else {
+			u.Path = b.RealPath(u.Path)
+		}
+
+		args := []string{"-xf", u.Path, "-C", b.Image.RealPath(dst)}
+
+		if u.Fragment != "" {
+			strip_components := 1 + strings.Count(u.Fragment, "/")
+			args = append(args, u.Fragment, "--strip-components", strconv.Itoa(strip_components))
+		}
+
+		if err := b.Task.RunCommand("tar", args...); err != nil {
 			return err
 		}
 	}

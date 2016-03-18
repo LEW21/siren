@@ -25,21 +25,21 @@ func Pull(uri, tag string, writer io.Writer) (image imagectl.Image, ret_tag stri
 		task.Require(err)
 	}()
 
-	var subpath string
-	u.Path, subpath = SplitSubPath(u.Path)
+	fragment := u.Fragment
+	u.Fragment = ""
 
 	uri = u.String()
 	repoRoot := "/var/lib/siren/" + unit.UnitNameEscape(uri)
 	sourceRoot := repoRoot
-	if subpath != "" {
-		sourceRoot = repoRoot + "/" + subpath
+	if fragment != "" {
+		sourceRoot = repoRoot + "/" + fragment
 	}
 
 	fi, err := os.Stat(repoRoot)
 	if err != nil {
 		func(){
 			task := NewTask(writer, "Cloning"); defer task.Finish()
-			task.Require(task.RunCommand("git", "clone", u.String(), repoRoot))
+			task.Require(task.RunCommand("git", "clone", uri, repoRoot))
 		}()
 	} else {
 		func(){
