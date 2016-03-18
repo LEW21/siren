@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"net/url"
+	"strings"
 
 	"github.com/coreos/go-systemd/unit"
 	"github.com/LEW21/siren/imagectl"
@@ -25,6 +26,12 @@ func Pull(uri, tag string, writer io.Writer) (image imagectl.Image, ret_tag stri
 		var err error
 		u, err = url.Parse(uri)
 		task.Require(err)
+
+		if u.Scheme == "git" || strings.HasPrefix(u.Scheme, "git+") {
+			u.Scheme = strings.TrimPrefix(u.Scheme, "git+")
+		} else {
+			task.Require(errors.New("Unsupported scheme: " + u.Scheme))
+		}
 	}()
 
 	fragment := u.Fragment
