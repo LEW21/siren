@@ -44,7 +44,7 @@ func (task *Task) Assert(test bool, err error) {
 
 func (task *Task) Require(err error) {
 	if err != nil {
-		fmt.Println(task, err)
+		fmt.Fprintln(task, "ERROR: " + err.Error())
 		panic(TaskFailed{})
 	}
 }
