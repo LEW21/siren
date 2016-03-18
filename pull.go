@@ -11,6 +11,8 @@ import (
 )
 
 func Pull(uri, tag string, writer io.Writer) (image imagectl.Image, ret_tag string, ok bool) {
+	EnsureSirenDirExists()
+
 	defer func(){
 		if r := recover(); r != nil {
 			ok = false

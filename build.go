@@ -71,6 +71,8 @@ func ReadMetadata(commands_in [][]string) (id, tag, name, version, base string, 
 }
 
 func Build(directory, tag string, writer io.Writer) (image imagectl.Image, ret_tag string, ok bool) {
+	EnsureSirenDirExists()
+
 	defer func(){
 		if r := recover(); r != nil {
 			ok = false
