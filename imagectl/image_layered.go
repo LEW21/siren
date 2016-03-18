@@ -224,6 +224,20 @@ func (i LayeredImage) LayerPath(path string) string {
 	return i.LayerRoot() + path
 }
 
+func (i LayeredImage) BaseLayers() []string {
+	if i.base == nil {
+		return []string{}
+	}
+
+	switch base := i.base.(type) {
+		case *LayeredImage:
+			return append(base.BaseLayers(), base.LayerFSRoot())
+
+		default:
+			return []string{base.Path()}
+	}
+}
+
 func (i *LayeredImage) create() error {
 	if err := os.MkdirAll(i.LayerRoot(), 0700); err != nil {
 		return err
@@ -296,7 +310,7 @@ func (i LayeredImage) setReady_setupMountPoints(sd *systemd.Conn) error {
 	rwLayer := i.LayerFSRoot()
 
 	if i.base != nil {
-		roLayers = []string{i.base.Path()}
+		roLayers = i.BaseLayers()
 	}
 
 	if i.frozen {
