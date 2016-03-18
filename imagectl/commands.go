@@ -7,7 +7,7 @@ import (
 	"github.com/fatih/color"
 )
 
-var Commands = []Command{CmdCreate, CmdTag, CmdSetReadOnly, CmdSetReady, CmdRemove, CmdList}
+var Commands = []Command{CmdCreate, CmdTag, CmdSetReadOnly, CmdSetReady, CmdRemove, CmdList, CmdRebase}
 
 var CmdCreate = Command{[]string{"new"}, "create", []string{"NAME"}, []string{"BASE_NAME"}, "Create a new image", cmdCreate}
 func cmdCreate(args []string) int {
@@ -273,5 +273,39 @@ func cmdList(args []string) int {
 	fmt.Println()
 	fmt.Println(strconv.Itoa(len(images)) + " images listed.")
 
+	return 0
+}
+
+var CmdRebase = Command{nil, "rebase", []string{"NAME", "NEW_BASE"}, nil, "Change the base image of an image", cmdRebase}
+func cmdRebase(args []string) int {
+	thisName := args[0]
+	newBaseName := args[1]
+
+	ictl, err := New()
+	if err != nil {
+		panic(err)
+	}
+
+	this, err := ictl.GetImage(thisName)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, thisName + ": Image does not exist.")
+		return 1
+	}
+
+	newBase, err := ictl.GetImage(newBaseName)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, newBaseName + ": Image does not exist.")
+		return 1
+	}
+
+	layeredImage, ok := this.(*LayeredImage)
+	if !ok {
+		fmt.Fprintln(os.Stderr, this.Name() + ": Not a layered image. Only layered images can be rebased.")
+		return 1
+	}
+
+	layeredImage.Rebase(newBase)
+
+	fmt.Println("Image rebased.")
 	return 0
 }

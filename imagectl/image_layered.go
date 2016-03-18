@@ -152,19 +152,32 @@ func (i *LayeredImage) SetReadOnly(readOnly bool) error {
 
 	ready := i.Ready()
 
-	if ready {
-		if err := i.SetReady(false); err != nil {
-			return err
-		}
+	if err := i.SetReady(false); err != nil {
+		return err
 	}
 
 	i.frozen = readOnly
 	i.saveMetadata()
 
-	if ready {
-		if err := i.SetReady(true); err != nil {
-			return err
-		}
+	if err := i.SetReady(ready); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (i *LayeredImage) Rebase(newBase Image) error {
+	ready := i.Ready()
+
+	if err := i.SetReady(false); err != nil {
+		return err
+	}
+
+	i.base = newBase
+	i.saveMetadata()
+
+	if err := i.SetReady(ready); err != nil {
+		return err
 	}
 
 	return nil
