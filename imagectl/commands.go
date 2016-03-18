@@ -60,40 +60,40 @@ func printChangeError(err error) int {
 	}
 }
 
-var CmdRemove = Command{[]string{"rm"}, "remove", []string{"NAME"}, nil, "Remove an image", cmdRemove}
+var CmdRemove = Command{[]string{"rm"}, "remove", []string{"NAME..."}, nil, "Remove an image", cmdRemove}
 func cmdRemove(args []string) int {
-	thisName := args[0]
-
-	target, err := UnTag(thisName)
-	switch err {
-		case nil:
-			fmt.Println("Tag removed.")
-			thisName = target
-
-		case ErrNotATag:
-			err = nil
-			break
-
-		default:
-			panic(err)
-	}
-
 	ictl, err := New()
 	if err != nil {
 		panic(err)
 	}
 
-	this, err := ictl.GetImage(thisName)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "Image does not exist.")
-		return 1
-	}
+	for _, thisName := range args {
+		target, err := UnTag(thisName)
+		switch err {
+			case nil:
+				fmt.Println(thisName + ": Tag removed.")
+				thisName = target
 
-	if err := this.Remove(); err != nil {
-		return printChangeError(err)
-	}
+			case ErrNotATag:
+				err = nil
+				break
 
-	fmt.Println("Image removed.")
+			default:
+				panic(err)
+		}
+
+		this, err := ictl.GetImage(thisName)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, thisName + ": Image does not exist.")
+			return 1
+		}
+
+		if err := this.Remove(); err != nil {
+			return printChangeError(err)
+		}
+
+		fmt.Println(thisName + ": Image removed.")
+	}
 	return 0
 }
 

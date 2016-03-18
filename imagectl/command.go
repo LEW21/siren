@@ -27,6 +27,13 @@ func (c Command) CheckArgs(args []string) bool {
 	at_least := len(c.ReqArgs)
 	at_most := len(c.ReqArgs) + len(c.OptArgs)
 
+	last_arg := ""
+	if len(c.OptArgs) > 0 {
+		last_arg = c.OptArgs[len(c.OptArgs)-1]
+	} else if len(c.ReqArgs) > 0 {
+		last_arg = c.ReqArgs[len(c.ReqArgs)-1]
+	}
+
 	if len(args) < at_least {
 		if at_least == 1 {
 			fmt.Fprintf(os.Stderr, "%v: \"%v\" requires at least 1 argument.\n\n", os.Args[0], c.Name)
@@ -37,7 +44,7 @@ func (c Command) CheckArgs(args []string) bool {
 		fmt.Fprint(os.Stderr, c.Description + "\n")
 		return false
 	}
-	if len(args) > at_most {
+	if len(args) > at_most && !strings.HasSuffix(last_arg, "...") {
 		if at_most == 1 {
 			fmt.Fprintf(os.Stderr, "%v: \"%v\" takes at most 1 argument.\n\n", os.Args[0], c.Name)
 		} else {
